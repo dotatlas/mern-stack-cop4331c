@@ -1,0 +1,9 @@
+# No droplet: production runs in the local Docker container too
+name: Production
+variables:
+  - name: baseURL
+    value: http://localhost:5000
+  - name: login
+    value: johnaedo
+  - name: password
+    value: ucf123!
