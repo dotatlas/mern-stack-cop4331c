@@ -7,7 +7,7 @@ const apiRouter = require('./routes');
 const { notFound, errorHandler } = require('./middleware/errorHandler');
 
 // --- Database -------------------------------------------------------------
-const url = process.env.MONGODB_URI || 'mongodb://localhost:27017/CardsDB';
+const url = process.env.MONGODB_URI || 'mongodb://localhost:27017/CalendarDB';
 mongoose
   .connect(url)
   .then(() => console.log('MongoDB connected successfully via Mongoose'))

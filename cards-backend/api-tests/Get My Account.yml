@@ -22,11 +22,11 @@ runtime:
 
         test("returns the logged-in user", function () {
           expect(body._id).to.equal(bru.getVar("userId"));
-          expect(body.login).to.equal(bru.getEnvVar("login"));
+          expect(body.email).to.equal(bru.getEnvVar("email"));
         });
 
-        test("never returns the password", function () {
-          expect(body).to.not.have.property("password");
+        test("never returns the password hash", function () {
+          expect(body).to.not.have.property("passwordHash");
         });
 
 settings:
