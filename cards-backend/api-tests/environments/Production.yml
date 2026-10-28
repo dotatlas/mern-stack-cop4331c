@@ -3,7 +3,7 @@ name: Production
 variables:
   - name: baseURL
     value: http://localhost:5000
-  - name: login
-    value: johnaedo
+  - name: email
+    value: demo@example.com
   - name: password
-    value: ucf123!
+    value: Demo123!

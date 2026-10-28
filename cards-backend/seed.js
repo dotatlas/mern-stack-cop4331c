@@ -1,73 +1,61 @@
+// Creates the demo account, or resets it: deletes the demo user and their
+// events and reminders, then creates them again with fresh sample data.
+// Run inside the container: docker compose exec api npm run seed
 const mongoose = require('mongoose');
 require('dotenv').config();
-const { User, Card } = require('./models');
+const { User, Event, Reminder } = require('./models');
 
-const url = process.env.MONGODB_URI || 'mongodb://localhost:27017/CardsDB';
+const url = process.env.MONGODB_URI || 'mongodb://localhost:27017/CalendarDB';
 
-const looneyTunesCards = [
-  { playerName: "Bugs Bunny", teamName: "Tune Squad", cardValue: 15000, publisher: "Warner Collectibles" },
-  { playerName: "Daffy Duck", teamName: "Duck Dodgers", cardValue: 12500, publisher: "Warner Collectibles" },
-  { playerName: "Porky Pig", teamName: "ACME All-Stars", cardValue: 8500, publisher: "Fleer" },
-  { playerName: "Yosemite Sam", teamName: "Wild West Legends", cardValue: 9200, publisher: "Donruss" },
-  { playerName: "Elmer Fudd", teamName: "Hunter Special", cardValue: 7800, publisher: "Topps" },
-  { playerName: "Tweety Bird", teamName: "Sky High", cardValue: 11000, publisher: "Upper Deck" },
-  { playerName: "Sylvester the Cat", teamName: "Alley Cats", cardValue: 6900, publisher: "Fleer" },
-  { playerName: "Tasmanian Devil", teamName: "Tazmanian Whirlwind", cardValue: 18500, publisher: "Panini" },
-  { playerName: "Road Runner", teamName: "ACME Speedsters", cardValue: 22000, publisher: "Upper Deck" },
-  { playerName: "Wile E. Coyote", teamName: "Genius Innovator", cardValue: 14000, publisher: "Donruss" },
-  { playerName: "Foghorn Leghorn", teamName: "Barnyard Heavyweights", cardValue: 9500, publisher: "Topps" },
-  { playerName: "Speedy Gonzales", teamName: "Fastest Mouse", cardValue: 16000, publisher: "Upper Deck" },
-  { playerName: "Marvin the Martian", teamName: "Illudium Q-36", cardValue: 27500, publisher: "Panini" },
-  { playerName: "Pepe Le Pew", teamName: "French Romantics", cardValue: 5400, publisher: "Fleer" },
-  { playerName: "Lola Bunny", teamName: "Tune Squad Captain", cardValue: 21000, publisher: "Topps" },
-  { playerName: "Granny", teamName: "Bird Protectors", cardValue: 4200, publisher: "Donruss" },
-  { playerName: "Michigan J. Frog", teamName: "Broadway Legends", cardValue: 35000, publisher: "Upper Deck" },
-  { playerName: "Gossamer", teamName: "Red Monster Squad", cardValue: 13500, publisher: "Fleer" },
-  { playerName: "Taz", teamName: "Wild Spinners", cardValue: 17000, publisher: "Topps" },
-  { playerName: "Barnyard Dawg", teamName: "Guard Dogs", cardValue: 6100, publisher: "Donruss" }
-];
+const DEMO_EMAIL = 'demo@example.com';
+const DEMO_PASSWORD = 'Demo123!';
+
+// A date `days` from today at hour:minute, so the demo data is always current
+function at(days, hour = 0, minute = 0) {
+  const d = new Date();
+  d.setDate(d.getDate() + days);
+  d.setHours(hour, minute, 0, 0);
+  return d;
+}
 
 async function seedDB() {
   try {
     await mongoose.connect(url);
-    console.log('Connected to MongoDB server via Mongoose');
 
-    let user = await User.findOne({ login: 'johnaedo' });
-
-    if (!user) {
-      user = await User.create({
-        firstName: 'John',
-        lastName: 'Aedo',
-        login: 'johnaedo',
-        password: 'ucf123!' // hashed by the User model before saving
-      });
-      console.log('Seeded initial user: johnaedo');
-    } else {
-      console.log('User "johnaedo" already exists');
+    const old = await User.findOne({ email: DEMO_EMAIL });
+    if (old) {
+      await Event.deleteMany({ userId: old._id });
+      await Reminder.deleteMany({ userId: old._id });
+      await old.deleteOne();
     }
 
-    const userIdStr = user._id.toString();
-    let seededCount = 0;
+    const user = new User({ firstName: 'Demo', lastName: 'User', email: DEMO_EMAIL, isVerified: true });
+    await user.setPassword(DEMO_PASSWORD);
+    await user.save();
+    const userId = user._id;
 
-    for (const card of looneyTunesCards) {
-      const existing = await Card.findOne({
-        userId: userIdStr,
-        playerName: card.playerName
-      });
+    // Created one by one (not insertMany) so the encryption setters always run
+    const events = await Event.create([
+      { userId, title: 'COP4331 Lecture', start: at(0, 10, 30), end: at(0, 11, 45), location: 'HEC 101', color: '#007AFF' },
+      { userId, title: 'Team 6 standup', start: at(1, 18), end: at(1, 18, 30), location: 'Discord', notes: 'Bring API progress', color: '#34C759' },
+      { userId, title: 'Dentist', start: at(2, 9), end: at(2, 10), location: 'Main St Dental', color: '#FF9500' },
+      { userId, title: 'Gym', start: at(3, 7), end: at(3, 8), color: '#FF2D55' },
+      { userId, title: 'Family dinner', start: at(5, 19), end: at(5, 21), notes: 'Pick up dessert', color: '#AF52DE' },
+      { userId, title: 'Spring break', start: at(14), end: at(18), allDay: true, color: '#5AC8FA' }
+    ]);
 
-      if (!existing) {
-        await Card.create({
-          ...card,
-          userId: userIdStr
-        });
-        seededCount++;
-      }
-    }
+    const reminders = await Reminder.create([
+      { userId, title: 'Submit MERN slides', notes: 'Every member submits', dueAt: at(4, 23, 59) },
+      { userId, title: 'Pay rent', dueAt: at(6, 12) },
+      { userId, title: 'Email professor', notes: 'Ask about presentation slot', dueAt: at(1, 9) },
+      { userId, title: 'Buy groceries', notes: 'Milk, eggs, coffee' },
+      { userId, title: 'Read chapter 5', completed: true }
+    ]);
 
-    console.log(`Seeded ${seededCount} Looney Tunes cards for user johnaedo.`);
-    console.log('Database seeding complete.');
+    console.log(`Demo account ${DEMO_EMAIL} / ${DEMO_PASSWORD}: ${events.length} events, ${reminders.length} reminders`);
   } catch (err) {
     console.error('Error seeding database:', err);
+    process.exitCode = 1;
   } finally {
     await mongoose.disconnect();
   }

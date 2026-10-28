@@ -12,9 +12,9 @@ http:
       {
         "firstName": "Test",
         "lastName": "Student",
-        "login": "{{newLogin}}",
+        "email": "{{newEmail}}",
         "password": "{{newPassword}}",
-        "email": "student@example.com"
+        "isVerified": true
       }
   auth: inherit
 
@@ -22,8 +22,8 @@ runtime:
   scripts:
     - type: before-request
       code: |-
-        // Registering the same login twice returns 409, so make each run unique
-        bru.setVar("newLogin", `student${Date.now()}`);
+        // Registering the same email twice returns 409, so make each run unique
+        bru.setVar("newEmail", `student${Date.now()}@example.com`);
         bru.setVar("newPassword", "Passw0rd!");
     - type: tests
       code: |-
@@ -35,15 +35,15 @@ runtime:
 
         test("returns a token and the new user", function () {
           expect(body.token).to.be.a("string");
-          expect(body.user.login).to.equal(bru.getVar("newLogin"));
+          expect(body.user.email).to.equal(bru.getVar("newEmail"));
         });
 
-        test("never returns the password", function () {
-          expect(body.user).to.not.have.property("password");
+        test("never returns the password hash", function () {
+          expect(body.user).to.not.have.property("passwordHash");
         });
 
-        test("ignores any role sent by the client", function () {
-          expect(body.user.role).to.equal("user");
+        test("starts unverified, even if the client says otherwise", function () {
+          expect(body.user.isVerified).to.equal(false);
         });
 
 settings:

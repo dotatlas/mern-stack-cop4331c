@@ -10,7 +10,7 @@ http:
     type: json
     data: |-
       {
-        "login": "{{login}}",
+        "email": "{{email}}",
         "password": "{{password}}"
       }
   auth: inherit
@@ -37,11 +37,11 @@ runtime:
         });
 
         test("returns the user that logged in", function () {
-          expect(body.user.login).to.equal(bru.getEnvVar("login"));
+          expect(body.user.email).to.equal(bru.getEnvVar("email"));
         });
 
-        test("never returns the password", function () {
-          expect(body.user).to.not.have.property("password");
+        test("never returns the password hash", function () {
+          expect(body.user).to.not.have.property("passwordHash");
         });
 
 settings:

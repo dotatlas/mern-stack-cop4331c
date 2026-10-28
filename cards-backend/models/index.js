@@ -1,7 +1,9 @@
 const User = require('./User');
-const Card = require('./Card');
+const Event = require('./Event');
+const Reminder = require('./Reminder');
 
 module.exports = {
   User,
-  Card
+  Event,
+  Reminder
 };

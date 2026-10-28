@@ -4,27 +4,25 @@ const { createToken } = require('../middleware/auth');
 // POST /api/users
 exports.createUser = async (req, res, next) => {
   try {
-    const { firstName = '', lastName = '', login, password, email = '' } = req.body || {};
+    const { firstName = '', lastName = '', email, password } = req.body || {};
 
-    if (!login || !password) {
-      return res.status(400).json({ error: 'login and password are required' });
+    if (!email || !password) {
+      return res.status(400).json({ error: 'email and password are required' });
     }
 
-    if (await User.exists({ login: String(login) })) {
-      return res.status(409).json({ error: 'A user with that login already exists' });
+    if (await User.exists({ email: String(email).trim().toLowerCase() })) {
+      return res.status(409).json({ error: 'An account with that email already exists' });
     }
 
-    // role is intentionally not read from the request body: letting clients
-    // choose their own role would let anyone register as an admin.
-    // The password is hashed by the User model before it is saved.
-    const user = await User.create({
+    // Only these fields are read from the body, so a client can't mark
+    // itself verified. New accounts start with isVerified: false.
+    const user = new User({
       firstName: String(firstName),
       lastName: String(lastName),
-      login: String(login),
-      password: String(password),
-      email: String(email),
-      role: 'user'
+      email: String(email)
     });
+    await user.setPassword(String(password));
+    await user.save();
 
     // A new user is logged in right away, so the response includes a token.
     res
