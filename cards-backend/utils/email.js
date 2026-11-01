@@ -3,10 +3,7 @@ const { Resend } = require('resend');
 const resend = new Resend(process.env.RESEND_API_KEY);
 
 exports.sendVerificationEmail = async (email, token) => {
-  /*const verificationLink =
-    `${process.env.FRONTEND_URL}/verify?token=${encodeURIComponent(token)}`;
-    ORRR     `${process.env.FRONTEND_URL}/verify-email?token=${encodeURIComponent(token)}`;
-    and it just takes you to the page dpends on password reset or not??
+  /*const verificationLink = `${process.env.FRONTEND_URL}/verify-email?token=${encodeURIComponent(token)}`;    
     //change back to this once frontend is up
 */  
   const verificationLink = `http://localhost:5000/api/auth/verify/${encodeURIComponent(token)}`;
