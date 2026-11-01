@@ -1,0 +1,59 @@
+info:
+  name: Regisiter
+  type: http
+  seq: 1
+
+http:
+  method: POST
+  url: "{{baseURL}}/api/auth/register"
+  body:
+    type: json
+    data: |-
+      {
+        "firstName": "Test",
+        "lastName": "Student",
+        "email": "{{newEmail}}",
+        "password": "{{newPassword}}"
+      }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        // Generate a unique email for each test run
+        bru.setVar("newEmail", `student${Date.now()}@example.com`);
+        bru.setVar("newPassword", "Passw0rd!");
+    - type: tests
+      code: |-
+        const body = res.getBody();
+
+        test("responds 201 Created", function () {
+          expect(res.getStatus()).to.equal(201);
+        });
+
+        test("returns a registration success message", function () {
+          expect(body.message).to.be.a("string");
+          expect(body.message).to.not.be.empty;
+        });
+
+        test("does not return a JWT before email verification", function () {
+          expect(body).to.not.have.property("token");
+        });
+
+        test("does not expose password information", function () {
+          expect(body).to.not.have.property("passwordHash");
+          expect(body).to.not.have.property("password");
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: true
+
+docs: |-
+  Registers a new user account.
+  The account starts unverified and a verification email is sent.
+  The user must verify their email before logging in.

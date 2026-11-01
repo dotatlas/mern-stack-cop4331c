@@ -9,5 +9,7 @@ router.get('/ping', (req, res) => {
 
 router.use('/auth', require('./auth'));
 router.use('/users', require('./users'));
+//router.use('/event', require('./event'));
+//router.use('/reminder', require('./reminder'));
 
 module.exports = router;

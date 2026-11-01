@@ -9,10 +9,12 @@ const router = express.Router();
 router.param('userId', validateObjectId);
 
 // POST /api/users - Register a new user (open to everyone)
-router.post('/', users.createUser);
+//router.post('/', users.createUser);  can regist without email
 
 // Everything below needs a logged-in user, and only their own account
 // GET /api/users/:userId - Fetch one user
 router.get('/:userId', requireAuth, requireSelf, users.getUser);
+
+router.delete('/:userId', users.deleteUser);
 
 module.exports = router;

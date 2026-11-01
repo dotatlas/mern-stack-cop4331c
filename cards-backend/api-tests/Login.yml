@@ -1,7 +1,7 @@
 info:
   name: Login
   type: http
-  seq: 3
+  seq: 4
 
 http:
   method: POST
@@ -49,6 +49,6 @@ settings:
   timeout: 0
   followRedirects: true
   maxRedirects: 5
+  forwardAuthorizationHeader: true
 
-docs: |-
-  Logs in as the user in the environment and saves {{token}} and {{userId}} for later requests.
+docs: Logs in as the user in the environment and saves {{token}} and {{userId}} for later requests.

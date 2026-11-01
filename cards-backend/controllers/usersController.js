@@ -48,3 +48,20 @@ exports.getUser = async (req, res, next) => {
     next(err);
   }
 };
+
+// DELETE /api/users.:userId
+exports.deleteUser = async (req, res, next) => {
+  try {
+    const user = await User.findByIdAndDelete(req.params.userId);
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    res.status(200).json({
+      message: 'User account deleted successfully'
+    });
+  } catch (err) {
+    next(err);
+  }
+};
