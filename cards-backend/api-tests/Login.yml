@@ -10,8 +10,8 @@ http:
     type: json
     data: |-
       {
-        "email": "{{email}}",
-        "password": "{{password}}"
+        "email": "{{newEmail}}",
+        "password": "{{newPassword}}"
       }
   auth: inherit
 
@@ -37,7 +37,7 @@ runtime:
         });
 
         test("returns the user that logged in", function () {
-          expect(body.user.email).to.equal(bru.getEnvVar("email"));
+          expect(body.user.email).to.equal(bru.getVar("newEmail"));
         });
 
         test("never returns the password hash", function () {
@@ -49,6 +49,6 @@ settings:
   timeout: 0
   followRedirects: true
   maxRedirects: 5
+  forwardAuthorizationHeader: true
 
-docs: |-
-  Logs in as the user in the environment and saves {{token}} and {{userId}} for later requests.
+docs: Logs in as the user Register just created and saves {{token}} and {{userId}} for later requests.
