@@ -1,9 +1,11 @@
+# Own project name so it never shares containers or the database volume with the Cards tutorial
+name: calendar
 services:
   api:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: mern_backend
+    container_name: calendar_api
     restart: unless-stopped
     ports:
       - "5000:5000"
@@ -25,7 +27,7 @@ services:
 
   mongodb:
     image: docker.io/mongo:7.0
-    container_name: mern_mongodb
+    container_name: calendar_mongodb
     restart: unless-stopped
     # Reachable only from this machine (for tools like MongoDB Compass).
     # Without 127.0.0.1, Docker would publish the database to the whole

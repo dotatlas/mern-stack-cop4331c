@@ -1,9 +1,9 @@
 {
-  "name": "backend",
+  "name": "calendar-backend",
   "version": "1.0.0",
-  "description": "MERN Stack Demo",
+  "description": "Team 6 Calendar + Reminders API",
   "license": "ISC",
-  "author": "John Aedo",
+  "author": "Team 6",
   "type": "commonjs",
   "main": "server.js",
   "scripts": {
