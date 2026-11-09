@@ -20,7 +20,6 @@ export default function LoginPage() {
 
     try {
       if (isRegistering) {
-        // Registration endpoint: satisfies rubric (name, login, password) and schema (firstName, lastName, email)
         const data = await apiRequest('/api/users', 'POST', {
           firstName: firstName.trim(),
           lastName: lastName.trim(),
@@ -39,7 +38,6 @@ export default function LoginPage() {
           setError('Registration successful! Please log in with your email.');
         }
       } else {
-        // Backend expects { email, password }
         const data = await apiRequest('/api/auth/login', 'POST', {
           email: email.trim().toLowerCase(),
           password,
@@ -50,7 +48,6 @@ export default function LoginPage() {
         navigate('/dashboard');
       }
     } catch (err: any) {
-      // Rubric requirement: generic error failure on bad login
       setError(
         isRegistering
           ? (err.message || 'Registration failed')
@@ -62,40 +59,47 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="container d-flex justify-content-center align-items-center vh-100">
-      <div className="card p-4 shadow-sm" style={{ width: '100%', maxWidth: '420px' }}>
-        <h3 className="text-center mb-3">
-          {isRegistering ? 'Register for Calendar' : 'Calendar Sign In'}
+    <div className="min-h-screen bg-[#f7f5f0] flex flex-col justify-center items-center p-4 font-sans text-stone-800">
+      
+      {/* Brand Header */}
+      <div className="mb-8 flex items-center gap-3">
+        <div className="w-10 h-10 bg-[#8b3d4b] rounded-lg flex items-center justify-center text-white font-bold text-lg shadow-sm">
+          C
+        </div>
+        <h1 className="text-3xl font-semibold tracking-tight text-stone-900">Calendar</h1>
+      </div>
+
+      {/* Login Card */}
+      <div className="bg-white p-8 rounded-2xl shadow-sm border border-stone-100 w-full max-w-[420px]">
+        <h3 className="text-xl font-semibold mb-6 text-center text-stone-800">
+          {isRegistering ? 'Create an Account' : 'Welcome Back'}
         </h3>
 
         {error && (
-          <div
-            className={`alert ${error.includes('successful') ? 'alert-success' : 'alert-danger'} py-2 text-center`}
-            role="alert"
-          >
+          <div className={`p-3 rounded-lg text-sm font-medium mb-6 text-center ${error.includes('successful') ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
             {error}
           </div>
         )}
 
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} className="space-y-4">
           {isRegistering ? (
             <>
-              <div className="row g-2 mb-3">
-                <div className="col">
-                  <label className="form-label">First Name</label>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-stone-500 uppercase tracking-wider mb-1.5">First Name</label>
                   <input
                     type="text"
-                    className="form-control"
+                    className="w-full bg-stone-50 border border-stone-200 rounded-lg p-2.5 text-sm focus:border-[#8b3d4b] focus:ring-1 focus:ring-[#8b3d4b] outline-none transition-all"
                     value={firstName}
                     onChange={(e) => setFirstName(e.target.value)}
                     required
                   />
                 </div>
-                <div className="col">
-                  <label className="form-label">Last Name</label>
+                <div>
+                  <label className="block text-xs font-semibold text-stone-500 uppercase tracking-wider mb-1.5">Last Name</label>
                   <input
                     type="text"
-                    className="form-control"
+                    className="w-full bg-stone-50 border border-stone-200 rounded-lg p-2.5 text-sm focus:border-[#8b3d4b] focus:ring-1 focus:ring-[#8b3d4b] outline-none transition-all"
                     value={lastName}
                     onChange={(e) => setLastName(e.target.value)}
                     required
@@ -103,11 +107,11 @@ export default function LoginPage() {
                 </div>
               </div>
 
-              <div className="mb-3">
-                <label className="form-label">Email Address</label>
+              <div>
+                <label className="block text-xs font-semibold text-stone-500 uppercase tracking-wider mb-1.5">Email Address</label>
                 <input
                   type="email"
-                  className="form-control"
+                  className="w-full bg-stone-50 border border-stone-200 rounded-lg p-2.5 text-sm focus:border-[#8b3d4b] focus:ring-1 focus:ring-[#8b3d4b] outline-none transition-all"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="name@example.com"
@@ -115,11 +119,11 @@ export default function LoginPage() {
                 />
               </div>
 
-              <div className="mb-3">
-                <label className="form-label">Desired Username / Login</label>
+              <div>
+                <label className="block text-xs font-semibold text-stone-500 uppercase tracking-wider mb-1.5">Username</label>
                 <input
                   type="text"
-                  className="form-control"
+                  className="w-full bg-stone-50 border border-stone-200 rounded-lg p-2.5 text-sm focus:border-[#8b3d4b] focus:ring-1 focus:ring-[#8b3d4b] outline-none transition-all"
                   value={login}
                   onChange={(e) => setLogin(e.target.value)}
                   required
@@ -127,11 +131,11 @@ export default function LoginPage() {
               </div>
             </>
           ) : (
-            <div className="mb-3">
-              <label className="form-label">Email Address</label>
+            <div>
+              <label className="block text-xs font-semibold text-stone-500 uppercase tracking-wider mb-1.5">Email Address</label>
               <input
                 type="email"
-                className="form-control"
+                className="w-full bg-stone-50 border border-stone-200 rounded-lg p-2.5 text-sm focus:border-[#8b3d4b] focus:ring-1 focus:ring-[#8b3d4b] outline-none transition-all"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="name@example.com"
@@ -140,26 +144,30 @@ export default function LoginPage() {
             </div>
           )}
 
-          <div className="mb-3">
-            <label className="form-label">Password</label>
+          <div>
+            <label className="block text-xs font-semibold text-stone-500 uppercase tracking-wider mb-1.5">Password</label>
             <input
               type="password"
-              className="form-control"
+              className="w-full bg-stone-50 border border-stone-200 rounded-lg p-2.5 text-sm focus:border-[#8b3d4b] focus:ring-1 focus:ring-[#8b3d4b] outline-none transition-all"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
             />
           </div>
 
-          <button type="submit" className="btn btn-primary w-100" disabled={loading}>
+          <button 
+            type="submit" 
+            className="w-full bg-[#8b3d4b] hover:bg-[#72323e] text-white font-medium py-3 px-4 rounded-lg transition-colors mt-6 shadow-sm"
+            disabled={loading}
+          >
             {loading ? 'Please wait...' : isRegistering ? 'Register' : 'Log In'}
           </button>
         </form>
 
-        <div className="text-center mt-3">
+        <div className="text-center mt-6 pt-6 border-t border-stone-100">
           <button
             type="button"
-            className="btn btn-link btn-sm"
+            className="text-sm font-medium text-stone-500 hover:text-stone-800 transition-colors"
             onClick={() => {
               setIsRegistering(!isRegistering);
               setError('');
