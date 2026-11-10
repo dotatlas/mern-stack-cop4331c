@@ -19,10 +19,3 @@ coverage/
 .idea/
 .DS_Store
 Thumbs.db
-
-.claude/
-CLAUDE.md
-CLAUDE.local.md
-
-# Private notes
-DATABASE_ROLE.md
