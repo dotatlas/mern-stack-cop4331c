@@ -1,12 +1,11 @@
-
-name: calendar_backend
-
+# Own project name so it never shares containers or the database volume with the Cards tutorial
+name: calendar
 services:
   api:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: calendar_backend_api
+    container_name: calendar_api
     restart: unless-stopped
     ports:
       - "5000:5000"
@@ -30,7 +29,7 @@ services:
 
   mongodb:
     image: docker.io/mongo:7.0
-    container_name: calendar_backend_mongodb
+    container_name: calendar_mongodb
     restart: unless-stopped
     ports:
       - "127.0.0.1:27018:27017"
