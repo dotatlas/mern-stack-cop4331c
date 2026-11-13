@@ -1,5 +1,9 @@
 const express = require('express');
-const users = require('../controllers/usersController');
+const {
+  createUser,
+  getUser,
+  deleteUser
+} = require('../controllers/usersController');
 const validateObjectId = require('../middleware/validateObjectId');
 const { requireAuth, requireSelf } = require('../middleware/auth');
 
@@ -9,12 +13,12 @@ const router = express.Router();
 router.param('userId', validateObjectId);
 
 // POST /api/users - Register a new user (open to everyone)
-//router.post('/', users.createUser);  can regist without email
+router.post('/', createUser);  
 
 // Everything below needs a logged-in user, and only their own account
 // GET /api/users/:userId - Fetch one user
-router.get('/:userId', requireAuth, requireSelf, users.getUser);
+router.get('/:userId', requireAuth, requireSelf, getUser);
 
-router.delete('/:userId', users.deleteUser);
+router.delete('/:userId', deleteUser);
 
 module.exports = router;

@@ -1,8 +1,15 @@
-const { User } = require('../models');
+const User = require('../models/User');
 const { createToken } = require('../middleware/auth');
+const crypto = require('crypto');
+const { sendVerificationEmail } = require('../utils/email');
+
+const hashToken = (token) =>
+  crypto.createHash('sha256').update(token).digest('hex');
 
 // POST /api/users
 exports.createUser = async (req, res, next) => {
+  let user;
+
   try {
     const { firstName = '', lastName = '', email, password } = req.body || {};
 
@@ -16,20 +23,30 @@ exports.createUser = async (req, res, next) => {
 
     // Only these fields are read from the body, so a client can't mark
     // itself verified. New accounts start with isVerified: false.
-    const user = new User({
+    user = new User({
       firstName: String(firstName),
       lastName: String(lastName),
       email: String(email)
     });
+
     await user.setPassword(String(password));
+
+    // generates email verification token
+    const token = crypto.randomBytes(32).toString('hex');
+    user.verifyToken = hashToken(token);
+
     await user.save();
 
-    // A new user is logged in right away, so the response includes a token.
-    res
-      .status(201)
-      .location(`/api/users/${user._id}`)
-      .json({ token: createToken(user), user });
+    await sendVerificationEmail(user.email, token);
+    
+    return res.status(201).json({
+      message: 'Account created. Check your email to verify your account.'
+    });
   } catch (err) {
+    // Avoid leaving an account that cannot receive its verification email.
+    if (user?._id) {
+      await User.deleteOne({ _id: user._id }).catch(() => {});
+    }
     next(err);
   }
 };

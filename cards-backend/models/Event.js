@@ -41,6 +41,12 @@ const eventSchema = new mongoose.Schema(
       type: String,
       default: '#007AFF',
       match: [/^#[0-9a-fA-F]{6}$/, 'Color must be a hex value like #007AFF']
+    },
+    category: {
+      type: String,
+      default: 'General',
+      trim: true,
+      maxlength: 50
     }
   },
   {

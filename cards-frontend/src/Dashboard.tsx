@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { apiRequest } from './api';
 
 interface CalendarEvent {
-  id: number;
+  id: string;
   title: string;
   date: string;
   time?: string;
@@ -19,33 +20,51 @@ interface Reminder {
   accent: 'blue' | 'pink' | 'green' | 'purple';
 }
 
+const accentColors = {
+  blue: '#2C3E55',
+  pink: '#A85368',
+  green: '#355E48',
+  purple: '#5E4068',
+};
+
+function toCalendarEvent(event: any): CalendarEvent {
+  const start = new Date(event.start);
+
+  const colorToAccent: Record<string, CalendarEvent['accent']> = {
+    '#2C3E55': 'blue',
+    '#A85368': 'pink',
+    '#355E48': 'green',
+    '#5E4068': 'purple',
+  };
+
+  const date = [
+    start.getFullYear(),
+    String(start.getMonth() + 1).padStart(2, '0'),
+    String(start.getDate()).padStart(2, '0'),
+  ].join('-');
+
+  return {
+    id: event._id,
+    title: event.title,
+    date,
+    time: event.allDay
+      ? undefined
+      : start.toLocaleTimeString([], {
+          hour: 'numeric',
+          minute: '2-digit',
+        }),
+    category: event.category || 'General',
+    notes: event.notes || '',
+    accent: colorToAccent[event.color] || 'blue',
+  };
+}
+
 export default function Dashboard() {
   const navigate = useNavigate();
 
   // User State
   const [userName, setUserName] = useState('Natasha');
   const [userInitials, setUserInitials] = useState('N');
-
-  // Load user from localStorage
-  useEffect(() => {
-    try {
-      const stored = localStorage.getItem('user');
-      if (stored) {
-        const u = JSON.parse(stored);
-        const name = u.firstName || u.name || u.login || 'Natasha';
-        setUserName(name);
-        const initials = name
-          .split(' ')
-          .map((n: string) => n[0])
-          .join('')
-          .toUpperCase()
-          .slice(0, 2);
-        setUserInitials(initials || 'N');
-      }
-    } catch {
-      // fallback defaults
-    }
-  }, []);
 
 // Real-time dynamic date detection
   const now = new Date();
@@ -56,8 +75,43 @@ export default function Dashboard() {
   // Calendar view state defaults to the current month & year
   const [currentDate, setCurrentDate] = useState(new Date(TODAY_YEAR, TODAY_MONTH, 1));
 
+    // Load user from localStorage
+  useEffect(() => {
+    const loadEvents = async () => {
+      if (!localStorage.getItem('token')) {
+        navigate('/');
+        return;
+      }
+
+      try {
+        const from = new Date(
+          currentDate.getFullYear(),
+          currentDate.getMonth(),
+          1
+        ).toISOString();
+
+        const to = new Date(
+          currentDate.getFullYear(),
+          currentDate.getMonth() + 1,
+          0,
+          23, 59, 59, 999
+        ).toISOString();
+
+        const data = await apiRequest(
+          `/api/events?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`
+        );
+
+        setEvents(data.events.map(toCalendarEvent));
+      } catch (err) {
+        console.error('Could not load events:', err);
+      }
+    };
+
+    loadEvents();
+  }, [navigate, currentDate]);
+
   // Events State - Muted cozy accents: dark blue, warm pink, dark green, muted purple
-  const [events, setEvents] = useState<CalendarEvent[]>([
+  /*const [events, setEvents] = useState<CalendarEvent[]>([
     {
       id: 1,
       title: "Jamie's Birthday Dinner",
@@ -103,8 +157,8 @@ export default function Dashboard() {
       notes: 'Discussion on classic cinema and design history',
       accent: 'blue',
     },
-  ]);
-
+  ]);*/  //  mock <data value="
+  const [events, setEvents] = useState<CalendarEvent[]>([]);
   // Reminders State
   const [reminders, setReminders] = useState<Reminder[]>([
     { id: 1, text: "Buy gift for Jamie", date: 'Completed', completed: true, accent: 'pink' },
@@ -143,27 +197,56 @@ export default function Dashboard() {
     'July', 'August', 'September', 'October', 'November', 'December'
   ];
 
-  const handleAddEvent = (e: React.FormEvent) => {
+  const handleAddEvent = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!eventTitle || !eventDate) return;
-    const [y, m, d] = eventDate.split('-');
-    const formatted = `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
-    setEvents([
-      ...events,
-      {
-        id: Date.now(),
-        title: eventTitle,
-        date: formatted,
-        time: eventTime,
-        category: eventCategory,
+
+    if (!eventTitle.trim() || !eventDate) return;
+
+    const start = eventTime.trim()
+      ? new Date(`${eventDate} ${eventTime}`)
+      : new Date(`${eventDate}T00:00:00`);
+
+    if (Number.isNaN(start.getTime())) {
+      alert('Please enter a valid event time.');
+      return;
+    }
+
+    const allDay = !eventTime.trim();
+
+    const end = new Date(start);
+
+    if (allDay) {
+      end.setHours(23, 59, 59, 999);
+    } else {
+      end.setHours(end.getHours() + 1);
+    }
+
+    const color = accentColors[eventAccent];
+
+    try {
+      const savedEvent = await apiRequest('/api/events', 'POST', {
+        title: eventTitle.trim(),
+        start: start.toISOString(),
+        end: end.toISOString(),
+        allDay,
+        location: '',
         notes: eventNotes,
-        accent: eventAccent,
-      },
-    ]);
-    setEventTitle('');
-    setEventDate('');
-    setEventTime('');
-    setEventNotes('');
+        category: eventCategory,
+        color,
+      });
+
+      setEvents((previous) => [
+        ...previous,
+        toCalendarEvent(savedEvent.event),
+      ]);
+
+      setEventTitle('');
+      setEventDate('');
+      setEventTime('');
+      setEventNotes('');
+    } catch (err: any) {
+      alert(err.message || 'Could not save the event.');
+    }
   };
 
   const handleAddReminder = (e: React.FormEvent) => {

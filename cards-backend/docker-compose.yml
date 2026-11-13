@@ -1,5 +1,5 @@
 # Own project name so it never shares containers or the database volume with the Cards tutorial
-name: calendar
+name: calendar-backend
 services:
   api:
     build:

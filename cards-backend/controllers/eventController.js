@@ -5,8 +5,13 @@ const mongoose = require('mongoose');
 // POST /api/events
 exports.createEvent = async (req, res) => {
   try {
-    const { title, start, end, allDay, location, notes, color } = req.body;
+    const { title, start, end, allDay, location, notes, color, category } = req.body;
 
+    if (category !== undefined && typeof category !== "string") {
+      return res.status(400).json({
+        error: "Category must be a string"
+      });
+    }
     // 1. Validate required fields
     if (!title || !start || !end) {
       return res.status(400).json({
@@ -63,7 +68,8 @@ exports.createEvent = async (req, res) => {
       allDay,
       location,
       notes,
-      color
+      color,
+      category
     });
 
     // 6. Return the created event
@@ -162,7 +168,8 @@ exports.updateEvent = async (req, res) => {
       "allDay",
       "location",
       "notes",
-      "color"
+      "color",
+      "category"
     ];
 
     const updates = {};
@@ -183,6 +190,7 @@ exports.updateEvent = async (req, res) => {
       if (typeof updates.title !== "string" || !updates.title.trim()) {
         return res.status(400).json({ error: "Invalid title" });
       }
+      
 
       updates.title = updates.title.trim();
     }
@@ -205,6 +213,10 @@ exports.updateEvent = async (req, res) => {
 
     if ("allDay" in updates && typeof updates.allDay !== "boolean") {
       return res.status(400).json({ error: "allDay must be a boolean" });
+    }
+
+    if ("category" in updates && typeof updates.category !== "string") {
+      return res.status(400).json({ error: "Category must be a string" });
     }
 
     for (const field of ["location", "notes", "color"]) {

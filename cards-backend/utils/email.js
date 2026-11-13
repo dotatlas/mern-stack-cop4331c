@@ -3,11 +3,10 @@ const { Resend } = require('resend');
 const resend = new Resend(process.env.RESEND_API_KEY);
 
 exports.sendVerificationEmail = async (email, token) => {
-  /*const verificationLink = `${process.env.FRONTEND_URL}/verify-email?token=${encodeURIComponent(token)}`;    
-    //change back to this once frontend is up
-*/  
-  const verificationLink = `http://localhost:5000/api/auth/verify/${encodeURIComponent(token)}`;
-  return resend.emails.send({
+  const verificationLink =
+    `${process.env.FRONTEND_URL}/verify-email?token=${encodeURIComponent(token)}`;
+
+  const { data, error } = await resend.emails.send({
     from: process.env.RESEND_FROM_EMAIL,
     to: email,
     subject: 'Verify your email',
@@ -17,13 +16,19 @@ exports.sendVerificationEmail = async (email, token) => {
       <a href="${verificationLink}">Verify Email</a>
     `
   });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return data;
 };
 
 // Send password reset link
 exports.sendPasswordResetEmail = async (email, token) => {
   const resetLink =
-    `${process.env.FRONTEND_URL}/verify-email?token=${encodeURIComponent(token)}`;
-
+    `${process.env.FRONTEND_URL}/reset-password?token=${encodeURIComponent(token)}`;
+    
   const { data, error } = await resend.emails.send({
     from: process.env.RESEND_FROM_EMAIL,
     to: email,

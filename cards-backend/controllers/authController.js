@@ -25,6 +25,7 @@ const isValidEmail = (email) => {
 
 // POST /api/auth/register     
 //creates an unverifed account and sends email
+//changes this so the create user now sned the email verfication instead
 exports.register = async (req, res, next) => {
   try {
     const { firstName, lastName, email, password } = req.body || {};
