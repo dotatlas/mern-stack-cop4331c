@@ -27,7 +27,7 @@ export default function LoginPage() {
 
     try {
       if (isForgotPassword) {
-        await apiRequest('/api/users/forgot-password', 'POST', {
+        await apiRequest('/api/auth/forgot-password', 'POST', {
           email: email.trim().toLowerCase(),
         });
 

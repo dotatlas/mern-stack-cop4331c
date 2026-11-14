@@ -2,7 +2,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import 'bootstrap/dist/css/bootstrap.min.css';
 import LoginPage from './LoginPage';
 import Dashboard from './Dashboard';
-import VerifyEmail from './VerifyEmail';
+import VerifyEmailPage from './VerifyEmailPage';
 import ResetPasswordPage from './ResetPasswordPage';
 
 function App() {
@@ -16,7 +16,7 @@ function App() {
         <Route path="/dashboard" element={<Dashboard />} />
         
         {/* Email verification */}
-        <Route path="/verify/:token" element={<VerifyEmail />} />
+        <Route path="/verify-email" element={<VerifyEmailPage />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
 
         {/* Catch-all redirects back to login */}

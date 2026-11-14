@@ -1,25 +1,35 @@
-
 import { useEffect, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { apiRequest } from './api';
 
 export default function VerifyEmailPage() {
-  const { token } = useParams();
+  const [searchParams] = useSearchParams();
+  const token = searchParams.get('token');
+
   const [message, setMessage] = useState('Verifying your email...');
   const [success, setSuccess] = useState(false);
 
   useEffect(() => {
     const verify = async () => {
       try {
-        await apiRequest(`/api/auth/verify/${token}`);
+        if (!token) {
+          throw new Error('Verification token is missing.');
+        }
+
+        await apiRequest(
+          `/api/auth/verify/${encodeURIComponent(token)}`
+        );
+
         setMessage('Your email has been verified! You can now log in.');
         setSuccess(true);
       } catch (err: any) {
-        setMessage(err.message || 'This verification link is invalid or expired.');
+        setMessage(
+          err.message || 'This verification link is invalid or expired.'
+        );
       }
     };
 
-    if (token) verify();
+    verify();
   }, [token]);
 
   return (

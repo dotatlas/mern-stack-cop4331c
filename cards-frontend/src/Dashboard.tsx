@@ -13,7 +13,7 @@ interface CalendarEvent {
 }
 
 interface Reminder {
-  id: number;
+  id: string;
   text: string;
   date?: string;
   completed: boolean;
@@ -59,12 +59,50 @@ function toCalendarEvent(event: any): CalendarEvent {
   };
 }
 
+function toReminder(reminder: any): Reminder {
+  const dueDate = reminder.dueAt ? new Date(reminder.dueAt) : null;
+
+  return {
+    id: reminder._id,
+    text: reminder.title,
+    date: dueDate
+      ? dueDate.toLocaleDateString('en-US', {
+          month: 'short',
+          day: 'numeric',
+          year: 'numeric',
+        })
+      : undefined,
+    completed: Boolean(reminder.completed),
+    // The current Reminder model does not have a priority field.
+    // Use a consistent accent for reminders until priority is added.
+    accent: reminder.completed ? 'pink' : 'green',
+  };
+}
+
 export default function Dashboard() {
   const navigate = useNavigate();
 
   // User State
-  const [userName, setUserName] = useState('Natasha');
-  const [userInitials, setUserInitials] = useState('N');
+  const [userName, setUserName] = useState('');
+  const [userInitials, setUserInitials] = useState('U');
+
+  useEffect(() => {
+    try {
+      const storedUser = localStorage.getItem('user');
+      if (!storedUser) return;
+
+      const user = JSON.parse(storedUser);
+      const firstName = user.firstName || '';
+      const lastName = user.lastName || '';
+      const fullName = `${firstName} ${lastName}`.trim();
+
+      if (fullName) setUserName(fullName);
+      const initials = `${firstName.charAt(0)}${lastName.charAt(0)}`.trim();
+      if (initials) setUserInitials(initials.toUpperCase());
+    } catch (err) {
+      console.error('Could not load user profile:', err);
+    }
+  }, []);
 
 // Real-time dynamic date detection
   const now = new Date();
@@ -110,63 +148,31 @@ export default function Dashboard() {
     loadEvents();
   }, [navigate, currentDate]);
 
-  // Events State - Muted cozy accents: dark blue, warm pink, dark green, muted purple
-  /*const [events, setEvents] = useState<CalendarEvent[]>([
-    {
-      id: 1,
-      title: "Jamie's Birthday Dinner",
-      date: '2026-11-06',
-      time: '7:00 PM',
-      category: 'Celebration',
-      notes: 'Table reserved downtown at Osteria',
-      accent: 'pink',
-    },
-    {
-      id: 2,
-      title: 'Pilates Studio Session',
-      date: '2026-11-07',
-      time: '9:30 AM',
-      category: 'Wellness',
-      notes: 'Morning reformer session with warm tea',
-      accent: 'green',
-    },
-    {
-      id: 3,
-      title: 'Design Critique & Review',
-      date: '2026-11-09',
-      time: '2:00 PM',
-      category: 'Project',
-      notes: 'Midterm sprint review and interface presentation',
-      accent: 'blue',
-    },
-    {
-      id: 4,
-      title: 'Portfolio Submission Due',
-      date: '2026-11-12',
-      time: '11:59 PM',
-      category: 'Project',
-      notes: 'Submit portfolio case studies and prototype slides',
-      accent: 'purple',
-    },
-    {
-      id: 5,
-      title: 'Evening Film & Book Club',
-      date: '2026-11-20',
-      time: '6:30 PM',
-      category: 'Personal',
-      notes: 'Discussion on classic cinema and design history',
-      accent: 'blue',
-    },
-  ]);*/  //  mock <data value="
+
+  // Load the signed-in user's reminders from MongoDB through the API.
+  useEffect(() => {
+    const loadReminders = async () => {
+      if (!localStorage.getItem('token')) {
+        navigate('/');
+        return;
+      }
+
+      try {
+        const data = await apiRequest('/api/reminders');
+        // The reminders GET route returns an array of reminder documents.
+        setReminders(data.map(toReminder));
+      } catch (err) {
+        console.error('Could not load reminders:', err);
+      }
+    };
+
+    loadReminders();
+  }, [navigate]);
+
+  // Events and reminders are loaded from the backend, not hardcoded demo data.
   const [events, setEvents] = useState<CalendarEvent[]>([]);
-  // Reminders State
-  const [reminders, setReminders] = useState<Reminder[]>([
-    { id: 1, text: "Buy gift for Jamie", date: 'Completed', completed: true, accent: 'pink' },
-    { id: 2, text: 'Review presentation slides', date: 'Today', completed: false, accent: 'blue' },
-    { id: 3, text: 'Submit Portfolio PDF to portal', date: 'Nov 12', completed: false, accent: 'purple' },
-    { id: 4, text: 'Book Saturday Pilates reformer', date: 'Nov 14', completed: false, accent: 'green' },
-    { id: 5, text: 'Pick up coffee beans & oat milk', date: 'Pending', completed: false, accent: 'pink' },
-  ]);
+  // Reminders are loaded from the backend; no frontend demo reminders.
+  const [reminders, setReminders] = useState<Reminder[]>([]);
 
   // Active form view: 'event' or 'reminder'
   const [panelTab, setPanelTab] = useState<'event' | 'reminder'>('event');
@@ -249,27 +255,47 @@ export default function Dashboard() {
     }
   };
 
-  const handleAddReminder = (e: React.FormEvent) => {
+  const handleAddReminder = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!reminderText.trim()) return;
-    setReminders([
-      ...reminders,
-      {
-        id: Date.now(),
-        text: reminderText.trim(),
-        date: reminderDate || 'Pending',
-        completed: false,
-        accent: 'green',
-      },
-    ]);
-    setReminderText('');
-    setReminderDate('');
+
+    try {
+      const savedReminder = await apiRequest('/api/reminders', 'POST', {
+        title: reminderText.trim(),
+        dueAt: reminderDate
+          ? new Date(`${reminderDate}T12:00:00`).toISOString()
+          : null,
+      });
+
+      // The reminders POST route returns the saved reminder document.
+      setReminders((previous) => [toReminder(savedReminder), ...previous]);
+      setReminderText('');
+      setReminderDate('');
+    } catch (err: any) {
+      alert(err.message || 'Could not save the reminder.');
+    }
   };
 
-  const toggleReminder = (id: number) => {
-    setReminders(
-      reminders.map((r) => (r.id === id ? { ...r, completed: !r.completed } : r))
-    );
+  const toggleReminder = async (id: string) => {
+    const reminder = reminders.find((item) => item.id === id);
+    if (!reminder) return;
+
+    try {
+      const updatedReminder = await apiRequest(
+        `/api/reminders/${id}/complete`,
+        'PATCH',
+        { completed: !reminder.completed }
+      );
+
+      // Update the UI only after the backend confirms the change.
+      setReminders((previous) =>
+        previous.map((item) =>
+          item.id === id ? toReminder(updatedReminder) : item
+        )
+      );
+    } catch (err: any) {
+      alert(err.message || 'Could not update the reminder.');
+    }
   };
 
   const handleLogout = () => {
@@ -360,7 +386,7 @@ export default function Dashboard() {
             <div className="text-base sm:text-lg font-sans font-semibold text-[#6C5B4F] leading-tight">
               Welcome back,{' '}
               <span className="font-serif font-black text-[#4E2E1E] text-xl sm:text-2xl tracking-tight">
-                {userName}
+                {userName || 'there'}
               </span>
             </div>
             <div className="text-[11px] font-sans font-bold uppercase tracking-wider text-[#355E48] flex items-center justify-end gap-1.5 mt-0.5">
@@ -547,12 +573,11 @@ export default function Dashboard() {
 
                 <div>
                   <label className="block text-xs font-sans font-bold uppercase tracking-wider text-[#6C5B4F] mb-1.5">
-                    Due Tag / Date
+                    Due Date (Optional)
                   </label>
                   <input
-                    type="text"
+                    type="date"
                     className="w-full bg-[#FFFFFF] border-2 border-[#CFBEAA] rounded-2xl p-3 text-sm font-semibold text-[#2C211B] placeholder-[#AFA193] focus:border-[#355E48] focus:ring-0 outline-none transition"
-                    placeholder="e.g. Today, Nov 12, or Friday"
                     value={reminderDate}
                     onChange={(e) => setReminderDate(e.target.value)}
                   />
@@ -596,7 +621,8 @@ export default function Dashboard() {
                     <input
                       type="checkbox"
                       checked={r.completed}
-                      onChange={() => {}}
+                      onChange={() => toggleReminder(r.id)}
+                      onClick={(e) => e.stopPropagation()}
                       className={`mt-1 h-4 w-4 rounded border-2 bg-transparent cursor-pointer ${styles.checkbox}`}
                     />
                     <div className="flex-1 min-w-0">

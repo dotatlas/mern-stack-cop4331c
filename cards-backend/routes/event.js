@@ -13,8 +13,6 @@ const router = express.Router();
 
 // POST /api/events
 router.post("/", requireAuth, createEvent);
-// POST /api/events
-router.post("/", requireAuth, createEvent);
 
 // GET /api/events?from=&to=
 router.get("/", requireAuth,  getEvents);
