@@ -1,0 +1,37 @@
+info:
+  name: Delete User
+  type: http
+  seq: 3
+
+http:
+  method: DELETE
+  url: "{{baseURL}}/api/users/{{userId}}"
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        const body = res.getBody();
+
+        test("responds 200 OK", function () {
+          expect(res.getStatus()).to.equal(200);
+        });
+
+        test("returns a deletion success message", function () {
+          expect(body.message).to.equal(
+            "User account deleted successfully"
+          );
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: true
+
+docs: |-
+  Deletes the currently authenticated user's account.
+  Requires a valid JWT and the user's own ID.
+  Useful for cleaning up test accounts during development.
