@@ -14,12 +14,13 @@ import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { apiRequest } from '@/api';
+import { useAuth, type User } from '@/auth';
 import { colors, fonts } from '@/theme';
 
 // What POST /auth/login sends back on success
 type LoginResponse = {
   token: string;
-  user: { _id: string; firstName: string; lastName: string; email: string };
+  user: User;
 };
 
 export default function LoginScreen() {
@@ -28,6 +29,7 @@ export default function LoginScreen() {
   const [focused, setFocused] = useState<'email' | 'password' | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { login } = useAuth();
   const passwordRef = useRef<React.ComponentRef<typeof TextInput>>(null);
 
   async function handleLogin() {
@@ -45,11 +47,9 @@ export default function LoginScreen() {
         email: email.trim(),
         password,
       });
+      await login(data.token, data.user); // saves to secure storage
       // replace (not push) swaps Login out for Home, so Back can't return here
-      router.replace({
-        pathname: '/home',
-        params: { firstName: data.user.firstName, lastName: data.user.lastName },
-      });
+      router.replace('/home');
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {

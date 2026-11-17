@@ -1,17 +1,15 @@
-import { router, useLocalSearchParams } from 'expo-router';
+import { router } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { useAuth } from '@/auth';
 import { colors, fonts } from '@/theme';
 
 export default function HomeScreen() {
-  // The login screen passes the name along when it navigates here
-  const { firstName, lastName } = useLocalSearchParams<{
-    firstName: string;
-    lastName: string;
-  }>();
+  const { user, logout } = useAuth();
 
-  function handleLogout() {
+  async function handleLogout() {
+    await logout(); // deletes the saved token and user
     // replace (not push) swaps Home out for Login, so Back can't return here
     router.replace('/login');
   }
@@ -42,7 +40,7 @@ export default function HomeScreen() {
 
         <View style={styles.card}>
           <Text style={styles.cardTitle}>
-            Welcome, {firstName} {lastName}
+            Welcome, {user?.firstName} {user?.lastName}
           </Text>
         </View>
       </View>
