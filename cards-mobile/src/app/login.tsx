@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
   Platform,
@@ -12,16 +13,44 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { apiRequest } from '@/api';
 import { colors, fonts } from '@/theme';
+
+// What POST /auth/login sends back on success
+type LoginResponse = {
+  token: string;
+  user: { _id: string; firstName: string; lastName: string; email: string };
+};
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [focused, setFocused] = useState<'email' | 'password' | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const passwordRef = useRef<React.ComponentRef<typeof TextInput>>(null);
 
-  function handleLogin() {
-    Alert.alert('You typed', `Email: ${email}\nPassword: ${password}`);
+  async function handleLogin() {
+    if (loading) return; // ignore extra taps / Enter presses while waiting
+
+    if (!email.trim() || !password) {
+      setError('Please enter your email and password');
+      return;
+    }
+
+    setError(null);
+    setLoading(true);
+    try {
+      const data = await apiRequest<LoginResponse>('/auth/login', 'POST', {
+        email: email.trim(),
+        password,
+      });
+      Alert.alert(`Welcome, ${data.user.firstName} ${data.user.lastName}!`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -84,11 +113,22 @@ export default function LoginScreen() {
               />
             </View>
 
+            {error && <Text style={styles.error}>{error}</Text>}
+
             <Pressable
-              style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]}
+              style={({ pressed }) => [
+                styles.button,
+                pressed && styles.buttonPressed,
+                loading && styles.buttonDisabled,
+              ]}
               onPress={handleLogin}
+              disabled={loading}
             >
-              <Text style={styles.buttonText}>Log In</Text>
+              {loading ? (
+                <ActivityIndicator color={colors.white} />
+              ) : (
+                <Text style={styles.buttonText}>Log In</Text>
+              )}
             </Pressable>
 
             <View style={styles.footer}>
@@ -207,6 +247,18 @@ const styles = StyleSheet.create({
   },
   buttonPressed: {
     backgroundColor: colors.burgundyPressed,
+  },
+  buttonDisabled: {
+    opacity: 0.7,
+  },
+
+  // Error message under the inputs
+  error: {
+    fontFamily: fonts.bodyMedium,
+    fontSize: 14,
+    color: colors.error,
+    textAlign: 'center',
+    marginBottom: 8,
   },
   buttonText: {
     color: colors.white,

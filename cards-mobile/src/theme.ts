@@ -6,6 +6,7 @@ export const colors = {
   page: '#f7f5f0', // bg-[#f7f5f0]  (screen background)
   cream: '#FAF5EE', // bg-[#FAF5EE]  (dashboard panels; the login card is white)
   white: '#ffffff',
+  error: '#b91c1c', // text-red-700  (error messages)
   // Tailwind's "stone" grays
   stone50: '#fafaf9',
   stone100: '#f5f5f4',
