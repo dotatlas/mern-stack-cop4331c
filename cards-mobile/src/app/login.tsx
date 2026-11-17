@@ -1,7 +1,6 @@
 import { useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -11,6 +10,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { apiRequest } from '@/api';
@@ -45,7 +45,11 @@ export default function LoginScreen() {
         email: email.trim(),
         password,
       });
-      Alert.alert(`Welcome, ${data.user.firstName} ${data.user.lastName}!`);
+      // replace (not push) swaps Login out for Home, so Back can't return here
+      router.replace({
+        pathname: '/home',
+        params: { firstName: data.user.firstName, lastName: data.user.lastName },
+      });
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
