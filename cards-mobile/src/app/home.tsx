@@ -1,5 +1,5 @@
-import { useLocalSearchParams } from 'expo-router';
-import { StyleSheet, Text, View } from 'react-native';
+import { router, useLocalSearchParams } from 'expo-router';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { colors, fonts } from '@/theme';
@@ -11,8 +11,26 @@ export default function HomeScreen() {
     lastName: string;
   }>();
 
+  function handleLogout() {
+    // replace (not push) swaps Home out for Login, so Back can't return here
+    router.replace('/login');
+  }
+
   return (
     <SafeAreaView style={styles.safeArea}>
+      {/* Top bar: Log Out on the right, like the web dashboard header */}
+      <View style={styles.topBar}>
+        <Pressable
+          onPress={handleLogout}
+          style={({ pressed }) => [styles.logoutButton, pressed && styles.logoutButtonPressed]}
+          accessibilityRole="button"
+        >
+          {({ pressed }) => (
+            <Text style={[styles.logoutText, pressed && styles.logoutTextPressed]}>Log Out</Text>
+          )}
+        </Pressable>
+      </View>
+
       <View style={styles.content}>
         {/* Brand header (same as the login screen) */}
         <View style={styles.brand}>
@@ -37,6 +55,38 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.page,
   },
+
+  // Top bar + Log Out (matches the web's rounded-full cream button)
+  topBar: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    paddingHorizontal: 16,
+    paddingTop: 8,
+  },
+  logoutButton: {
+    backgroundColor: colors.cream,
+    borderWidth: 2,
+    borderColor: colors.tan,
+    borderRadius: 999,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    boxShadow: '0 1px rgba(0, 0, 0, 0.05)',
+  },
+  logoutButtonPressed: {
+    borderColor: colors.tanDark,
+    transform: [{ scale: 0.95 }],
+  },
+  logoutText: {
+    fontFamily: fonts.bodyBold,
+    fontSize: 12,
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
+    color: colors.brown,
+  },
+  logoutTextPressed: {
+    color: colors.brownDark,
+  },
+
   content: {
     flex: 1,
     justifyContent: 'center',

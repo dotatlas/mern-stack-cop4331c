@@ -6,6 +6,11 @@ export const colors = {
   page: '#f7f5f0', // bg-[#f7f5f0]  (screen background)
   cream: '#FAF5EE', // bg-[#FAF5EE]  (dashboard panels; the login card is white)
   white: '#ffffff',
+  // Dashboard's warm browns (web Log Out button)
+  brown: '#6C5B4F', // text-[#6C5B4F]
+  brownDark: '#2C211B', // hover:text-[#2C211B]
+  tan: '#CFBEAA', // border-[#CFBEAA]
+  tanDark: '#7B6A5E', // hover:border-[#7B6A5E]
   error: '#b91c1c', // text-red-700  (error messages)
   // Tailwind's "stone" grays
   stone50: '#fafaf9',
