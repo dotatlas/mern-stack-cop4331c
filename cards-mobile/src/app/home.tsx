@@ -1,12 +1,29 @@
 import { router } from 'expo-router';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useState } from 'react';
+import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { useAuth } from '@/auth';
+import { apiRequest } from '@/api';
+import { useAuth, type User } from '@/auth';
 import { colors, fonts } from '@/theme';
 
 export default function HomeScreen() {
   const { user, logout } = useAuth();
+  const [checking, setChecking] = useState(false);
+
+  // Asks the server for my account. Only works if the token is sent along.
+  async function handleCheckAccount() {
+    if (!user || checking) return;
+    setChecking(true);
+    try {
+      const account = await apiRequest<User>(`/users/${user._id}`);
+      Alert.alert('Your account', `${account.firstName} ${account.lastName}\n${account.email}`);
+    } catch (e) {
+      Alert.alert('Could not check account', e instanceof Error ? e.message : String(e));
+    } finally {
+      setChecking(false);
+    }
+  }
 
   async function handleLogout() {
     await logout(); // deletes the saved token and user
@@ -42,6 +59,23 @@ export default function HomeScreen() {
           <Text style={styles.cardTitle}>
             Welcome, {user?.firstName} {user?.lastName}
           </Text>
+
+          <Pressable
+            onPress={handleCheckAccount}
+            disabled={checking}
+            style={({ pressed }) => [
+              styles.checkButton,
+              pressed && styles.checkButtonPressed,
+              checking && styles.checkButtonDisabled,
+            ]}
+            accessibilityRole="button"
+          >
+            {checking ? (
+              <ActivityIndicator color={colors.burgundy} />
+            ) : (
+              <Text style={styles.checkButtonText}>Check my account</Text>
+            )}
+          </Pressable>
         </View>
       </View>
     </SafeAreaView>
@@ -136,5 +170,26 @@ const styles = StyleSheet.create({
     fontSize: 20,
     color: colors.stone800,
     textAlign: 'center',
+  },
+
+  // "Check my account": outlined version of the burgundy button
+  checkButton: {
+    marginTop: 24,
+    borderWidth: 1,
+    borderColor: colors.burgundy,
+    borderRadius: 8,
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  checkButtonPressed: {
+    backgroundColor: colors.stone50,
+  },
+  checkButtonDisabled: {
+    opacity: 0.7,
+  },
+  checkButtonText: {
+    fontFamily: fonts.bodyMedium,
+    fontSize: 14,
+    color: colors.burgundy,
   },
 });

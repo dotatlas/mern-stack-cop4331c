@@ -1,5 +1,8 @@
+import { router } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
+
+import { setAuthToken, setUnauthorizedHandler } from '@/api';
 
 // The logged-in user, as POST /auth/login returns it
 export type User = {
@@ -36,6 +39,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const savedToken = await SecureStore.getItemAsync(TOKEN_KEY);
         const savedUser = await SecureStore.getItemAsync(USER_KEY);
         if (savedToken && savedUser) {
+          setAuthToken(savedToken); // apiRequest sends it from now on
           setToken(savedToken);
           setUser(JSON.parse(savedUser));
         }
@@ -48,14 +52,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     loadSavedLogin();
   }, []);
 
+  // If the server ever rejects the token (401), log out and go to Login
+  useEffect(() => {
+    setUnauthorizedHandler(async () => {
+      await logout();
+      router.replace('/login');
+    });
+    return () => setUnauthorizedHandler(null);
+  }, []);
+
   async function login(newToken: string, newUser: User) {
     await SecureStore.setItemAsync(TOKEN_KEY, newToken);
     await SecureStore.setItemAsync(USER_KEY, JSON.stringify(newUser));
+    setAuthToken(newToken);
     setToken(newToken);
     setUser(newUser);
   }
 
   async function logout() {
+    setAuthToken(null); // stop sending the token right away
     await SecureStore.deleteItemAsync(TOKEN_KEY);
     await SecureStore.deleteItemAsync(USER_KEY);
     setToken(null);
