@@ -10,6 +10,7 @@ router.get('/ping', (req, res) => {
 router.use('/auth', require('./auth'));
 router.use('/users', require('./users'));
 router.use('/events', require('./event'));
+router.use('/push', require('./push'));
 router.use('/reminders', require('./reminder'));
 
 module.exports = router;

@@ -16,6 +16,7 @@ interface Reminder {
   id: string;
   text: string;
   date?: string;
+  time?: string;
   completed: boolean;
   accent: 'blue' | 'pink' | 'green' | 'purple';
 }
@@ -26,6 +27,12 @@ const accentColors = {
   green: '#355E48',
   purple: '#5E4068',
 };
+
+function urlBase64ToUint8Array(base64String: string) {
+  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+  const raw = window.atob((base64String + padding).replace(/-/g, '+').replace(/_/g, '/'));
+  return Uint8Array.from([...raw].map((char) => char.charCodeAt(0)));
+}
 
 function toCalendarEvent(event: any): CalendarEvent {
   const start = new Date(event.start);
@@ -69,13 +76,17 @@ function toReminder(reminder: any): Reminder {
       ? dueDate.toLocaleDateString('en-US', {
           month: 'short',
           day: 'numeric',
-          year: 'numeric',
+          year: 'numeric'
+        })
+      : undefined,
+    time: dueDate && (dueDate.getHours() !== 12 || dueDate.getMinutes() !== 0)
+      ? dueDate.toLocaleTimeString('en-US', {
+          hour: 'numeric',
+          minute: '2-digit'
         })
       : undefined,
     completed: Boolean(reminder.completed),
-    // The current Reminder model does not have a priority field.
-    // Use a consistent accent for reminders until priority is added.
-    accent: reminder.completed ? 'pink' : 'green',
+    accent: reminder.completed ? 'pink' : 'green'
   };
 }
 
@@ -85,6 +96,66 @@ export default function Dashboard() {
   // User State
   const [userName, setUserName] = useState('');
   const [userInitials, setUserInitials] = useState('U');
+  const [notificationsEnabled, setNotificationsEnabled] = useState(false);
+  const [notificationBusy, setNotificationBusy] = useState(false);
+  const [notificationMessage, setNotificationMessage] = useState('');
+
+  useEffect(() => {
+    if (!localStorage.getItem('token')) return;
+    apiRequest('/api/push/status')
+      .then((status) => setNotificationsEnabled(Boolean(status.enabled)))
+      .catch((error) => console.error('Could not load notification status:', error));
+  }, []);
+
+  const toggleNotifications = async () => {
+    if (!('Notification' in window) || !('serviceWorker' in navigator)) {
+      setNotificationMessage('Push notifications are not supported by this browser.');
+      return;
+    }
+
+    setNotificationBusy(true);
+    setNotificationMessage('');
+    try {
+      const registration = await navigator.serviceWorker.ready;
+      let subscription = await registration.pushManager.getSubscription();
+
+      if (notificationsEnabled) {
+        if (subscription) {
+          await apiRequest('/api/push/unsubscribe', 'DELETE', { endpoint: subscription.endpoint });
+          await subscription.unsubscribe();
+        }
+        setNotificationsEnabled(false);
+        setNotificationMessage('Reminder notifications are off.');
+        return;
+      }
+
+      const permission = Notification.permission === 'granted'
+        ? 'granted'
+        : await Notification.requestPermission();
+      if (permission !== 'granted') {
+        setNotificationMessage(`Browser notification permission is ${permission}.`);
+        return;
+      }
+
+      const keyResponse = await apiRequest('/api/push/public-key');
+      if (!keyResponse?.publicKey) throw new Error('The notification service is not configured.');
+      if (!subscription) {
+        subscription = await registration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(keyResponse.publicKey),
+        });
+      }
+
+      await apiRequest('/api/push/subscribe', 'POST', subscription.toJSON());
+      setNotificationsEnabled(true);
+      setNotificationMessage('Reminder notifications are enabled on this device.');
+    } catch (error) {
+      console.error('Could not update notification subscription:', error);
+      setNotificationMessage(error instanceof Error ? error.message : 'Could not update notification settings.');
+    } finally {
+      setNotificationBusy(false);
+    }
+  };
 
   useEffect(() => {
     try {
@@ -188,7 +259,7 @@ export default function Dashboard() {
   // Form Inputs - Reminder
   const [reminderText, setReminderText] = useState('');
   const [reminderDate, setReminderDate] = useState('');
-
+  const [reminderTime, setReminderTime] = useState('');
   // Modal State
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
 
@@ -257,20 +328,43 @@ export default function Dashboard() {
 
   const handleAddReminder = async (e: React.FormEvent) => {
     e.preventDefault();
+
     if (!reminderText.trim()) return;
+
+    // Combine the selected date and optional time.
+    // If no time is selected, preserve the existing noon default.
+    let dueAt: string | null = null;
+
+    if (reminderDate) {
+      const dateTime = reminderTime
+        ? `${reminderDate}T${reminderTime}:00`
+        : `${reminderDate}T12:00:00`;
+
+      const parsedDate = new Date(dateTime);
+
+      if (Number.isNaN(parsedDate.getTime())) {
+        alert('Please enter a valid reminder date and time.');
+        return;
+      }
+
+      dueAt = parsedDate.toISOString();
+    }
 
     try {
       const savedReminder = await apiRequest('/api/reminders', 'POST', {
         title: reminderText.trim(),
-        dueAt: reminderDate
-          ? new Date(`${reminderDate}T12:00:00`).toISOString()
-          : null,
+        dueAt
       });
 
-      // The reminders POST route returns the saved reminder document.
-      setReminders((previous) => [toReminder(savedReminder), ...previous]);
+      setReminders((previous) => [
+        toReminder(savedReminder),
+        ...previous
+      ]);
+
       setReminderText('');
       setReminderDate('');
+      setReminderTime('');
+
     } catch (err: any) {
       alert(err.message || 'Could not save the reminder.');
     }
@@ -398,6 +492,20 @@ export default function Dashboard() {
           {/* User Avatar Badge */}
           <div className="w-12 h-12 rounded-2xl bg-[#ECE1D2] border-2 border-[#CFBEAA] text-[#4E2E1E] flex items-center justify-center font-serif font-black text-lg shadow-2xs">
             {userInitials}
+          </div>
+
+          <div className="flex flex-col items-center gap-1">
+            <button
+              type="button"
+              role="switch"
+              aria-checked={notificationsEnabled}
+              onClick={toggleNotifications}
+              disabled={notificationBusy}
+              className={`text-xs font-sans font-bold border-2 rounded-full px-4 py-2.5 transition cursor-pointer disabled:opacity-60 ${notificationsEnabled ? 'bg-[#355E48] border-[#355E48] text-white' : 'bg-[#FAF5EE] border-[#CFBEAA] text-[#6C5B4F]'}`}
+            >
+              {notificationBusy ? 'Updating…' : notificationsEnabled ? 'Notifications On' : 'Enable Notifications'}
+            </button>
+            {notificationMessage && <span role="status" className="absolute top-full right-28 mt-1 w-64 text-right text-[11px] text-[#6C5B4F]">{notificationMessage}</span>}
           </div>
 
           {/* Log Out Button */}
@@ -582,6 +690,25 @@ export default function Dashboard() {
                     onChange={(e) => setReminderDate(e.target.value)}
                   />
                 </div>
+                <div>
+                  <label className="block text-xs font-sans font-bold uppercase tracking-wider text-[#6C5B4F] mb-1.5">
+                    Due Time (Optional)
+                  </label>
+
+                  <input
+                    type="time"
+                    className="w-full bg-[#FFFFFF] border-2 border-[#CFBEAA] rounded-2xl p-3 text-sm font-semibold text-[#2C211B] focus:border-[#355E48] focus:ring-0 outline-none transition"
+                    value={reminderTime}
+                    onChange={(e) => setReminderTime(e.target.value)}
+                    disabled={!reminderDate}
+                  />
+
+                  {!reminderDate && (
+                    <p className="text-xs text-[#9C8A7C] mt-1">
+                      Select a due date first to add a time.
+                    </p>
+                  )}
+                </div>
 
                 <button
                   type="submit"
@@ -637,6 +764,7 @@ export default function Dashboard() {
                         <div className="text-xs font-sans font-semibold text-[#7B6A5E] mt-0.5 flex items-center gap-1.5">
                           <span className={`inline-block w-2 h-2 rounded-full ${styles.dot}`}></span>
                           {r.date}
+                          {r.time && ` • ${r.time}`}
                         </div>
                       )}
                     </div>

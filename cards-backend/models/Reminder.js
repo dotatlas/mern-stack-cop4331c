@@ -6,8 +6,10 @@ const reminderSchema = new mongoose.Schema(
     userId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
-      required: [true, 'userId is required']
-    }, //Optional: link to an event
+      required: [true, 'userId is required'],
+      index: true
+    },
+
     eventId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Event',
@@ -18,7 +20,7 @@ const reminderSchema = new mongoose.Schema(
       required: [true, 'Title is required']
     },
     notes: encryptedString(2000),
-    // Optional: reminders with a due date also show on the calendar
+
     dueAt: {
       type: Date,
       default: null
@@ -31,6 +33,31 @@ const reminderSchema = new mongoose.Schema(
       type: String,
       enum: ['low', 'medium', 'high'],
       default: 'medium'
+    },
+    // Notification tracking
+    notificationStatus: {
+      type: String,
+      enum: ['pending', 'processing', 'sent', 'failed'],
+      default: 'pending',
+      index: true
+    },
+    notificationSentAt: {
+      type: Date,
+      default: null
+    },
+    notificationFiveMinuteSentAt: {
+      type: Date,
+      default: null
+    },
+    // Used to recover reminders after a scheduler crash
+    notificationProcessingAt: {
+      type: Date,
+      default: null
+    },
+
+    notificationAttempts: {
+      type: Number,
+      default: 0
     }
   },
   {
@@ -41,7 +68,14 @@ const reminderSchema = new mongoose.Schema(
   }
 );
 
-// The reminders list and the calendar feed both load one user's reminders by due date
+// Existing calendar/reminder query index
 reminderSchema.index({ userId: 1, dueAt: 1 });
+
+// Scheduler query index
+reminderSchema.index({
+  notificationStatus: 1,
+  dueAt: 1,
+  completed: 1
+});
 
 module.exports = mongoose.model('Reminder', reminderSchema);
