@@ -19,6 +19,9 @@ services:
       - RESEND_API_KEY=${RESEND_API_KEY}
       - RESEND_FROM_EMAIL=${RESEND_FROM_EMAIL}
       - FRONTEND_URL=${FRONTEND_URL}
+      - VAPID_PUBLIC_KEY=${VAPID_PUBLIC_KEY:?Set VAPID_PUBLIC_KEY in .env}
+      - VAPID_PRIVATE_KEY=${VAPID_PRIVATE_KEY:?Set VAPID_PRIVATE_KEY in .env}
+      - VAPID_SUBJECT=${VAPID_SUBJECT:?Set VAPID_SUBJECT in .env}
     volumes:
       - .:/usr/src/app
       - /usr/src/app/node_modules

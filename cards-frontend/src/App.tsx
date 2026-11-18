@@ -4,6 +4,7 @@ import LoginPage from './LoginPage';
 import Dashboard from './Dashboard';
 import VerifyEmailPage from './VerifyEmailPage';
 import ResetPasswordPage from './ResetPasswordPage';
+import NotificationTest from './NotificationTest';
 
 function App() {
   return (
@@ -18,6 +19,9 @@ function App() {
         {/* Email verification */}
         <Route path="/verify-email" element={<VerifyEmailPage />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
+
+        {/*test for browse nofications*/}
+        <Route path="/notification-test" element={<NotificationTest />} />
 
         {/* Catch-all redirects back to login */}
         <Route path="*" element={<Navigate to="/" replace />} />

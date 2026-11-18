@@ -249,7 +249,7 @@ exports.updateEvent = async (req, res) => {
     const event = await Event.findOneAndUpdate(
       { _id: id, userId: req.userId },
       { $set: updates },
-      { new: true, runValidators: true }
+      { returnDocument: 'after', runValidators: true }
     );
 
     return res.status(200).json({

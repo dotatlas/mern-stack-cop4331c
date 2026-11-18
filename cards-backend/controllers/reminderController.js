@@ -319,6 +319,15 @@ exports.updateReminder = async (req, res) => {
       }
     }
 
+    // Reset notification tracking when the due date or time changes.
+    if (updates.dueAt !== undefined) {
+      updates.notificationStatus = 'pending';
+      updates.notificationSentAt = null;
+      updates.notificationFiveMinuteSentAt = null;
+      updates.notificationProcessingAt = null;
+      updates.notificationAttempts = 0;
+    }
+
     const reminder = await Reminder.findOneAndUpdate(
       {
         _id: id,
@@ -326,7 +335,7 @@ exports.updateReminder = async (req, res) => {
       },
       { $set: updates },
       {
-        new: true,
+      returnDocument: 'after',
         runValidators: true
       }
     );
@@ -396,7 +405,7 @@ exports.toggleReminderComplete = async (req, res) => {
       },
       { $set: { completed } },
       {
-        new: true,
+      returnDocument: 'after',
         runValidators: true
       }
     );
