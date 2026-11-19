@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiRequest } from './api';
@@ -77,22 +76,28 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#f7f5f0] flex flex-col justify-center items-center p-4 font-sans text-stone-800">
-
+    <div className="min-h-screen bg-[#F4EDE4] text-[#2C211B] flex flex-col justify-center items-center p-6 font-sans antialiased selection:bg-[#355E48]/20 selection:text-[#2C211B]">
       {/* Brand Header */}
-      <div className="mb-8 flex items-center gap-3">
-        <div className="w-10 h-10 bg-[#8b3d4b] rounded-lg flex items-center justify-center text-white font-bold text-lg shadow-sm">
+      <div className="mb-8 flex items-center gap-4">
+        <div className="w-12 h-12 bg-[#4E2E1E] text-[#FAF5EE] rounded-2xl flex items-center justify-center font-serif font-black text-2xl shadow-sm ring-4 ring-[#4E2E1E]/10">
           C
         </div>
-        <h1 className="text-3xl font-semibold tracking-tight text-stone-900">
-          Calendar
-        </h1>
+        <div>
+          <div className="flex items-center gap-2">
+            <h1 className="text-3xl font-serif font-black tracking-tight text-[#2C211B] leading-none">
+              Calendar
+            </h1>
+            <span className="inline-block w-2.5 h-2.5 rounded-full bg-[#355E48]"></span>
+          </div>
+          <span className="text-xs font-sans font-bold uppercase tracking-widest text-[#7B6A5E] mt-1 block">
+            Workspace & Schedule
+          </span>
+        </div>
       </div>
 
-      {/* Login Card */}
-      <div className="bg-white p-8 rounded-2xl shadow-sm border border-stone-100 w-full max-w-[420px]">
-
-        <h3 className="text-xl font-semibold mb-2 text-center text-stone-800">
+      {/* Auth Card */}
+      <div className="bg-[#FAF5EE] p-8 rounded-3xl shadow-md border-2 border-[#D5C6B3] w-full max-w-[440px]">
+        <h3 className="text-2xl font-serif font-black mb-2 text-center text-[#2C211B]">
           {isForgotPassword
             ? 'Forgot Password?'
             : isRegistering
@@ -100,40 +105,41 @@ export default function LoginPage() {
               : 'Welcome Back'}
         </h3>
 
-        {isForgotPassword && (
-          <p className="text-sm text-stone-500 text-center mb-6">
+        {isForgotPassword ? (
+          <p className="text-sm font-medium text-[#7B6A5E] text-center mb-6">
             Enter your email address and we'll send you a link to reset your password.
+          </p>
+        ) : (
+          <p className="text-xs font-sans font-bold uppercase tracking-wider text-[#7B6A5E] text-center mb-6">
+            {isRegistering ? 'Set up your calendar workspace' : 'Sign in to your schedule'}
           </p>
         )}
 
-        {!isForgotPassword && <div className="mb-4" />}
-
-        {/* Error */}
+        {/* Error Banner */}
         {error && (
-          <div className="p-3 rounded-lg text-sm font-medium mb-6 text-center bg-red-50 text-red-700 border border-red-200">
+          <div className="p-3.5 rounded-2xl text-sm font-semibold mb-6 text-center bg-[#A85368]/12 text-[#632736] border-2 border-[#A85368]/30">
             {error}
           </div>
         )}
 
-        {/* Success */}
+        {/* Success Banner */}
         {success && (
-          <div className="p-3 rounded-lg text-sm font-medium mb-6 text-center bg-green-50 text-green-700 border border-green-200">
+          <div className="p-3.5 rounded-2xl text-sm font-semibold mb-6 text-center bg-[#355E48]/12 text-[#1E3E2D] border-2 border-[#355E48]/30">
             {success}
           </div>
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
-
           {/* Registration Fields */}
           {isRegistering && !isForgotPassword && (
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-3.5">
               <div>
-                <label className="block text-xs font-semibold text-stone-500 uppercase tracking-wider mb-1.5">
+                <label className="block text-xs font-sans font-bold uppercase tracking-wider text-[#6C5B4F] mb-1.5">
                   First Name
                 </label>
                 <input
                   type="text"
-                  className="w-full bg-stone-50 border border-stone-200 rounded-lg p-2.5 text-sm outline-none focus:border-[#8b3d4b]"
+                  className="w-full bg-[#FFFFFF] border-2 border-[#CFBEAA] rounded-2xl p-3 text-sm font-semibold text-[#2C211B] placeholder-[#AFA193] focus:border-[#4E2E1E] focus:ring-0 outline-none transition"
                   value={firstName}
                   onChange={(e) => setFirstName(e.target.value)}
                   required
@@ -141,12 +147,12 @@ export default function LoginPage() {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-stone-500 uppercase tracking-wider mb-1.5">
+                <label className="block text-xs font-sans font-bold uppercase tracking-wider text-[#6C5B4F] mb-1.5">
                   Last Name
                 </label>
                 <input
                   type="text"
-                  className="w-full bg-stone-50 border border-stone-200 rounded-lg p-2.5 text-sm outline-none focus:border-[#8b3d4b]"
+                  className="w-full bg-[#FFFFFF] border-2 border-[#CFBEAA] rounded-2xl p-3 text-sm font-semibold text-[#2C211B] placeholder-[#AFA193] focus:border-[#4E2E1E] focus:ring-0 outline-none transition"
                   value={lastName}
                   onChange={(e) => setLastName(e.target.value)}
                   required
@@ -157,12 +163,12 @@ export default function LoginPage() {
 
           {/* Email */}
           <div>
-            <label className="block text-xs font-semibold text-stone-500 uppercase tracking-wider mb-1.5">
+            <label className="block text-xs font-sans font-bold uppercase tracking-wider text-[#6C5B4F] mb-1.5">
               Email Address
             </label>
             <input
               type="email"
-              className="w-full bg-stone-50 border border-stone-200 rounded-lg p-2.5 text-sm outline-none focus:border-[#8b3d4b]"
+              className="w-full bg-[#FFFFFF] border-2 border-[#CFBEAA] rounded-2xl p-3 text-sm font-semibold text-[#2C211B] placeholder-[#AFA193] focus:border-[#4E2E1E] focus:ring-0 outline-none transition"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="name@example.com"
@@ -174,14 +180,14 @@ export default function LoginPage() {
           {!isForgotPassword && (
             <div>
               <div className="flex justify-between items-center mb-1.5">
-                <label className="block text-xs font-semibold text-stone-500 uppercase tracking-wider">
+                <label className="block text-xs font-sans font-bold uppercase tracking-wider text-[#6C5B4F]">
                   Password
                 </label>
 
                 {!isRegistering && (
                   <button
                     type="button"
-                    className="text-xs font-medium text-[#8b3d4b] hover:underline"
+                    className="text-xs font-sans font-bold text-[#4E2E1E] hover:underline cursor-pointer"
                     onClick={() => {
                       setIsForgotPassword(true);
                       setError('');
@@ -195,7 +201,7 @@ export default function LoginPage() {
 
               <input
                 type="password"
-                className="w-full bg-stone-50 border border-stone-200 rounded-lg p-2.5 text-sm outline-none focus:border-[#8b3d4b]"
+                className="w-full bg-[#FFFFFF] border-2 border-[#CFBEAA] rounded-2xl p-3 text-sm font-semibold text-[#2C211B] placeholder-[#AFA193] focus:border-[#4E2E1E] focus:ring-0 outline-none transition"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
@@ -203,10 +209,10 @@ export default function LoginPage() {
             </div>
           )}
 
-          {/* Submit */}
+          {/* Submit Button */}
           <button
             type="submit"
-            className="w-full bg-[#8b3d4b] hover:bg-[#72323e] text-white font-medium py-3 px-4 rounded-lg transition-colors mt-6 shadow-sm disabled:opacity-60"
+            className="w-full bg-[#4E2E1E] hover:bg-[#3D2214] text-[#FAF5EE] font-sans font-bold py-3.5 px-4 rounded-2xl text-sm uppercase tracking-wider shadow-sm transition active:scale-[0.98] mt-6 cursor-pointer disabled:opacity-60"
             disabled={loading}
           >
             {loading
@@ -219,12 +225,12 @@ export default function LoginPage() {
           </button>
         </form>
 
-        {/* Navigation */}
-        <div className="text-center mt-6 pt-6 border-t border-stone-100">
+        {/* Bottom Navigation */}
+        <div className="text-center mt-6 pt-6 border-t-2 border-[#DFD3C3]">
           {isForgotPassword ? (
             <button
               type="button"
-              className="text-sm font-medium text-stone-500 hover:text-stone-800"
+              className="text-xs font-sans font-bold uppercase tracking-wider text-[#6C5B4F] hover:text-[#2C211B] transition cursor-pointer"
               onClick={resetView}
             >
               Back to Log In
@@ -232,7 +238,7 @@ export default function LoginPage() {
           ) : (
             <button
               type="button"
-              className="text-sm font-medium text-stone-500 hover:text-stone-800 transition-colors"
+              className="text-xs font-sans font-bold uppercase tracking-wider text-[#6C5B4F] hover:text-[#2C211B] transition cursor-pointer"
               onClick={() => {
                 setIsRegistering(!isRegistering);
                 setError('');

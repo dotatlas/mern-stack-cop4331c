@@ -17,6 +17,8 @@ interface Reminder {
   text: string;
   date?: string;
   time?: string;
+  rawDate?: string;
+  rawTime?: string;
   completed: boolean;
   accent: 'blue' | 'pink' | 'green' | 'purple';
 }
@@ -68,6 +70,8 @@ function toCalendarEvent(event: any): CalendarEvent {
 
 function toReminder(reminder: any): Reminder {
   const dueDate = reminder.dueAt ? new Date(reminder.dueAt) : null;
+  const hasCustomTime =
+    dueDate !== null && (dueDate.getHours() !== 12 || dueDate.getMinutes() !== 0);
 
   return {
     id: reminder._id,
@@ -76,17 +80,27 @@ function toReminder(reminder: any): Reminder {
       ? dueDate.toLocaleDateString('en-US', {
           month: 'short',
           day: 'numeric',
-          year: 'numeric'
+          year: 'numeric',
         })
       : undefined,
-    time: dueDate && (dueDate.getHours() !== 12 || dueDate.getMinutes() !== 0)
-      ? dueDate.toLocaleTimeString('en-US', {
+    time: hasCustomTime
+      ? dueDate!.toLocaleTimeString('en-US', {
           hour: 'numeric',
-          minute: '2-digit'
+          minute: '2-digit',
         })
       : undefined,
+    rawDate: dueDate
+      ? [
+          dueDate.getFullYear(),
+          String(dueDate.getMonth() + 1).padStart(2, '0'),
+          String(dueDate.getDate()).padStart(2, '0'),
+        ].join('-')
+      : '',
+    rawTime: hasCustomTime
+      ? `${String(dueDate!.getHours()).padStart(2, '0')}:${String(dueDate!.getMinutes()).padStart(2, '0')}`
+      : '',
     completed: Boolean(reminder.completed),
-    accent: reminder.completed ? 'pink' : 'green'
+    accent: reminder.completed ? 'pink' : 'green',
   };
 }
 
@@ -129,9 +143,10 @@ export default function Dashboard() {
         return;
       }
 
-      const permission = Notification.permission === 'granted'
-        ? 'granted'
-        : await Notification.requestPermission();
+      const permission =
+        Notification.permission === 'granted'
+          ? 'granted'
+          : await Notification.requestPermission();
       if (permission !== 'granted') {
         setNotificationMessage(`Browser notification permission is ${permission}.`);
         return;
@@ -151,7 +166,9 @@ export default function Dashboard() {
       setNotificationMessage('Reminder notifications are enabled on this device.');
     } catch (error) {
       console.error('Could not update notification subscription:', error);
-      setNotificationMessage(error instanceof Error ? error.message : 'Could not update notification settings.');
+      setNotificationMessage(
+        error instanceof Error ? error.message : 'Could not update notification settings.'
+      );
     } finally {
       setNotificationBusy(false);
     }
@@ -175,16 +192,16 @@ export default function Dashboard() {
     }
   }, []);
 
-// Real-time dynamic date detection
+  // Real-time dynamic date detection
   const now = new Date();
   const TODAY_YEAR = now.getFullYear();
-  const TODAY_MONTH = now.getMonth(); // 0-indexed: 0 = Jan, 10 = Nov, etc.
+  const TODAY_MONTH = now.getMonth();
   const TODAY_DAY = now.getDate();
 
   // Calendar view state defaults to the current month & year
   const [currentDate, setCurrentDate] = useState(new Date(TODAY_YEAR, TODAY_MONTH, 1));
 
-    // Load user from localStorage
+  // Load events from MongoDB
   useEffect(() => {
     const loadEvents = async () => {
       if (!localStorage.getItem('token')) {
@@ -203,7 +220,10 @@ export default function Dashboard() {
           currentDate.getFullYear(),
           currentDate.getMonth() + 1,
           0,
-          23, 59, 59, 999
+          23,
+          59,
+          59,
+          999
         ).toISOString();
 
         const data = await apiRequest(
@@ -219,8 +239,7 @@ export default function Dashboard() {
     loadEvents();
   }, [navigate, currentDate]);
 
-
-  // Load the signed-in user's reminders from MongoDB through the API.
+  // Load reminders from MongoDB
   useEffect(() => {
     const loadReminders = async () => {
       if (!localStorage.getItem('token')) {
@@ -230,7 +249,6 @@ export default function Dashboard() {
 
       try {
         const data = await apiRequest('/api/reminders');
-        // The reminders GET route returns an array of reminder documents.
         setReminders(data.map(toReminder));
       } catch (err) {
         console.error('Could not load reminders:', err);
@@ -240,15 +258,13 @@ export default function Dashboard() {
     loadReminders();
   }, [navigate]);
 
-  // Events and reminders are loaded from the backend, not hardcoded demo data.
   const [events, setEvents] = useState<CalendarEvent[]>([]);
-  // Reminders are loaded from the backend; no frontend demo reminders.
   const [reminders, setReminders] = useState<Reminder[]>([]);
 
   // Active form view: 'event' or 'reminder'
   const [panelTab, setPanelTab] = useState<'event' | 'reminder'>('event');
 
-  // Form Inputs - Event
+  // Form Inputs - New Event
   const [eventTitle, setEventTitle] = useState('');
   const [eventDate, setEventDate] = useState('');
   const [eventTime, setEventTime] = useState('');
@@ -256,12 +272,27 @@ export default function Dashboard() {
   const [eventNotes, setEventNotes] = useState('');
   const [eventAccent, setEventAccent] = useState<'blue' | 'pink' | 'green' | 'purple'>('blue');
 
-  // Form Inputs - Reminder
+  // Form Inputs - New Reminder
   const [reminderText, setReminderText] = useState('');
   const [reminderDate, setReminderDate] = useState('');
   const [reminderTime, setReminderTime] = useState('');
-  // Modal State
+
+  // Modal & Edit State - Events
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
+  const [showAddEventModal, setShowAddEventModal] = useState(false);
+  const [isEditingEvent, setIsEditingEvent] = useState(false);
+  const [editEventTitle, setEditEventTitle] = useState('');
+  const [editEventDate, setEditEventDate] = useState('');
+  const [editEventTime, setEditEventTime] = useState('');
+  const [editEventCategory, setEditEventCategory] = useState('Personal');
+  const [editEventNotes, setEditEventNotes] = useState('');
+  const [editEventAccent, setEditEventAccent] = useState<'blue' | 'pink' | 'green' | 'purple'>('blue');
+
+  // Inline Edit State - Reminders
+  const [editingReminderId, setEditingReminderId] = useState<string | null>(null);
+  const [editReminderText, setEditReminderText] = useState('');
+  const [editReminderDate, setEditReminderDate] = useState('');
+  const [editReminderTime, setEditReminderTime] = useState('');
 
   // Month Math
   const currentMonth = currentDate.getMonth();
@@ -271,12 +302,21 @@ export default function Dashboard() {
 
   const monthNames = [
     'January', 'February', 'March', 'April', 'May', 'June',
-    'July', 'August', 'September', 'October', 'November', 'December'
+    'July', 'August', 'September', 'October', 'November', 'December',
   ];
+
+  // ─── EVENT HANDLERS ───────────────────────────────────────────────
+  const handleDayClick = (dayNum: number) => {
+    const formatted = `${currentYear}-${(currentMonth + 1)
+      .toString()
+      .padStart(2, '0')}-${dayNum.toString().padStart(2, '0')}`;
+    setEventDate(formatted);
+    setPanelTab('event');
+    setShowAddEventModal(true);
+  };
 
   const handleAddEvent = async (e: React.FormEvent) => {
     e.preventDefault();
-
     if (!eventTitle.trim() || !eventDate) return;
 
     const start = eventTime.trim()
@@ -289,16 +329,12 @@ export default function Dashboard() {
     }
 
     const allDay = !eventTime.trim();
-
     const end = new Date(start);
-
     if (allDay) {
       end.setHours(23, 59, 59, 999);
     } else {
       end.setHours(end.getHours() + 1);
     }
-
-    const color = accentColors[eventAccent];
 
     try {
       const savedEvent = await apiRequest('/api/events', 'POST', {
@@ -309,62 +345,126 @@ export default function Dashboard() {
         location: '',
         notes: eventNotes,
         category: eventCategory,
-        color,
+        color: accentColors[eventAccent],
       });
 
-      setEvents((previous) => [
-        ...previous,
-        toCalendarEvent(savedEvent.event),
-      ]);
+      setEvents((previous) => [...previous, toCalendarEvent(savedEvent.event || savedEvent)]);
 
       setEventTitle('');
       setEventDate('');
       setEventTime('');
       setEventNotes('');
+      setShowAddEventModal(false);
     } catch (err: any) {
       alert(err.message || 'Could not save the event.');
     }
   };
 
+  const openEventModal = (ev: CalendarEvent) => {
+    setSelectedEvent(ev);
+    setIsEditingEvent(false);
+  };
+
+  const closeEventModal = () => {
+    setSelectedEvent(null);
+    setIsEditingEvent(false);
+  };
+
+  const startEditingEvent = (ev: CalendarEvent) => {
+    setEditEventTitle(ev.title);
+    setEditEventDate(ev.date);
+    setEditEventTime(ev.time || '');
+    setEditEventCategory(ev.category);
+    setEditEventNotes(ev.notes || '');
+    setEditEventAccent(ev.accent);
+    setIsEditingEvent(true);
+  };
+
+  const handleUpdateEvent = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedEvent || !editEventTitle.trim() || !editEventDate) return;
+
+    const start = editEventTime.trim()
+      ? new Date(`${editEventDate} ${editEventTime}`)
+      : new Date(`${editEventDate}T00:00:00`);
+
+    if (Number.isNaN(start.getTime())) {
+      alert('Please enter a valid event time.');
+      return;
+    }
+
+    const allDay = !editEventTime.trim();
+    const end = new Date(start);
+    if (allDay) {
+      end.setHours(23, 59, 59, 999);
+    } else {
+      end.setHours(end.getHours() + 1);
+    }
+
+    try {
+      // Note: Swap 'PUT' to 'PATCH' if your backend routes/events.js uses router.patch
+      const updated = await apiRequest(`/api/events/${selectedEvent.id}`, 'PUT', {
+        title: editEventTitle.trim(),
+        start: start.toISOString(),
+        end: end.toISOString(),
+        allDay,
+        location: '',
+        notes: editEventNotes,
+        category: editEventCategory,
+        color: accentColors[editEventAccent],
+      });
+
+      const mapped = toCalendarEvent(updated.event || updated);
+      setEvents((previous) =>
+        previous.map((item) => (item.id === mapped.id ? mapped : item))
+      );
+      setSelectedEvent(mapped);
+      setIsEditingEvent(false);
+    } catch (err: any) {
+      alert(err.message || 'Could not update the event.');
+    }
+  };
+
+  const handleDeleteEvent = async (id: string) => {
+    if (!window.confirm('Delete this event?')) return;
+    try {
+      await apiRequest(`/api/events/${id}`, 'DELETE');
+      setEvents((previous) => previous.filter((item) => item.id !== id));
+      closeEventModal();
+    } catch (err: any) {
+      alert(err.message || 'Could not delete the event.');
+    }
+  };
+
+  // ─── REMINDER HANDLERS ────────────────────────────────────────────
   const handleAddReminder = async (e: React.FormEvent) => {
     e.preventDefault();
-
     if (!reminderText.trim()) return;
 
-    // Combine the selected date and optional time.
-    // If no time is selected, preserve the existing noon default.
     let dueAt: string | null = null;
-
     if (reminderDate) {
       const dateTime = reminderTime
         ? `${reminderDate}T${reminderTime}:00`
         : `${reminderDate}T12:00:00`;
 
       const parsedDate = new Date(dateTime);
-
       if (Number.isNaN(parsedDate.getTime())) {
         alert('Please enter a valid reminder date and time.');
         return;
       }
-
       dueAt = parsedDate.toISOString();
     }
 
     try {
       const savedReminder = await apiRequest('/api/reminders', 'POST', {
         title: reminderText.trim(),
-        dueAt
+        dueAt,
       });
 
-      setReminders((previous) => [
-        toReminder(savedReminder),
-        ...previous
-      ]);
-
+      setReminders((previous) => [toReminder(savedReminder), ...previous]);
       setReminderText('');
       setReminderDate('');
       setReminderTime('');
-
     } catch (err: any) {
       alert(err.message || 'Could not save the reminder.');
     }
@@ -381,14 +481,65 @@ export default function Dashboard() {
         { completed: !reminder.completed }
       );
 
-      // Update the UI only after the backend confirms the change.
       setReminders((previous) =>
-        previous.map((item) =>
-          item.id === id ? toReminder(updatedReminder) : item
-        )
+        previous.map((item) => (item.id === id ? toReminder(updatedReminder) : item))
       );
     } catch (err: any) {
       alert(err.message || 'Could not update the reminder.');
+    }
+  };
+
+  const startEditingReminder = (r: Reminder) => {
+    setEditingReminderId(r.id);
+    setEditReminderText(r.text);
+    setEditReminderDate(r.rawDate || '');
+    setEditReminderTime(r.rawTime || '');
+  };
+
+  const handleUpdateReminder = async (e: React.FormEvent, id: string) => {
+    e.preventDefault();
+    if (!editReminderText.trim()) return;
+
+    let dueAt: string | null = null;
+    if (editReminderDate) {
+      const dateTime = editReminderTime
+        ? `${editReminderDate}T${editReminderTime}:00`
+        : `${editReminderDate}T12:00:00`;
+
+      const parsedDate = new Date(dateTime);
+      if (Number.isNaN(parsedDate.getTime())) {
+        alert('Please enter a valid reminder date and time.');
+        return;
+      }
+      dueAt = parsedDate.toISOString();
+    }
+
+    try {
+      // Note: Swap 'PUT' to 'PATCH' if your backend routes/reminders.js uses router.patch
+      const updated = await apiRequest(`/api/reminders/${id}`, 'PUT', {
+        title: editReminderText.trim(),
+        dueAt,
+      });
+
+      setReminders((previous) =>
+        previous.map((item) =>
+          item.id === id ? toReminder(updated.reminder || updated) : item
+        )
+      );
+      setEditingReminderId(null);
+    } catch (err: any) {
+      alert(err.message || 'Could not update the reminder.');
+    }
+  };
+
+  const handleDeleteReminder = async (id: string) => {
+    if (!window.confirm('Delete this reminder?')) return;
+    try {
+      await apiRequest(`/api/reminders/${id}`, 'DELETE');
+      setReminders((previous) => previous.filter((item) => item.id !== id));
+      if (editingReminderId === id) setEditingReminderId(null);
+    } catch (err: any) {
+      alert(err.message || 'Could not delete the reminder.');
     }
   };
 
@@ -403,15 +554,12 @@ export default function Dashboard() {
   const jumpToToday = () => setCurrentDate(new Date(TODAY_YEAR, TODAY_MONTH, 1));
 
   const getEventsForDay = (dayNum: number) => {
-    const formatted = `${currentYear}-${(currentMonth + 1).toString().padStart(2, '0')}-${dayNum.toString().padStart(2, '0')}`;
+    const formatted = `${currentYear}-${(currentMonth + 1)
+      .toString()
+      .padStart(2, '0')}-${dayNum.toString().padStart(2, '0')}`;
     return events.filter((e) => e.date === formatted);
   };
 
-  // Color tokens tailored for a beige aesthetic:
-  // - Dark Blue: Slate Indigo (#2C3E55)
-  // - Warm Pink: Dusty Muted Rose (#A85368)
-  // - Dark Green: Forest Moss (#355E48)
-  // - Purple: Muted Plum / Eggplant (#5E4068)
   const getAccentStyles = (accent: string) => {
     switch (accent) {
       case 'blue':
@@ -456,7 +604,6 @@ export default function Dashboard() {
           1. TOP NAVIGATION / PROFILE BAR
          ───────────────────────────────────────────────────────────── */}
       <header className="bg-[#FAF5EE] border-b-2 border-[#DFD3C3] px-8 py-5 flex items-center justify-between sticky top-0 z-20 shadow-xs">
-        {/* Brand */}
         <div className="flex items-center gap-4">
           <div className="w-12 h-12 bg-[#4E2E1E] text-[#FAF5EE] rounded-2xl flex items-center justify-center font-serif font-black text-2xl shadow-sm ring-4 ring-[#4E2E1E]/10">
             C
@@ -474,7 +621,6 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* User / Profile Section - Bolder & Pushed to Far Right */}
         <div className="flex items-center gap-6 ml-auto">
           <div className="text-right">
             <div className="text-base sm:text-lg font-sans font-semibold text-[#6C5B4F] leading-tight">
@@ -489,7 +635,6 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* User Avatar Badge */}
           <div className="w-12 h-12 rounded-2xl bg-[#ECE1D2] border-2 border-[#CFBEAA] text-[#4E2E1E] flex items-center justify-center font-serif font-black text-lg shadow-2xs">
             {userInitials}
           </div>
@@ -501,14 +646,28 @@ export default function Dashboard() {
               aria-checked={notificationsEnabled}
               onClick={toggleNotifications}
               disabled={notificationBusy}
-              className={`text-xs font-sans font-bold border-2 rounded-full px-4 py-2.5 transition cursor-pointer disabled:opacity-60 ${notificationsEnabled ? 'bg-[#355E48] border-[#355E48] text-white' : 'bg-[#FAF5EE] border-[#CFBEAA] text-[#6C5B4F]'}`}
+              className={`text-xs font-sans font-bold border-2 rounded-full px-4 py-2.5 transition cursor-pointer disabled:opacity-60 ${
+                notificationsEnabled
+                  ? 'bg-[#355E48] border-[#355E48] text-white'
+                  : 'bg-[#FAF5EE] border-[#CFBEAA] text-[#6C5B4F]'
+              }`}
             >
-              {notificationBusy ? 'Updating…' : notificationsEnabled ? 'Notifications On' : 'Enable Notifications'}
+              {notificationBusy
+                ? 'Updating…'
+                : notificationsEnabled
+                  ? 'Notifications On'
+                  : 'Enable Notifications'}
             </button>
-            {notificationMessage && <span role="status" className="absolute top-full right-28 mt-1 w-64 text-right text-[11px] text-[#6C5B4F]">{notificationMessage}</span>}
+            {notificationMessage && (
+              <span
+                role="status"
+                className="absolute top-full right-28 mt-1 w-64 text-right text-[11px] text-[#6C5B4F]"
+              >
+                {notificationMessage}
+              </span>
+            )}
           </div>
 
-          {/* Log Out Button */}
           <button
             onClick={handleLogout}
             className="text-xs font-sans font-bold uppercase tracking-wider text-[#6C5B4F] hover:text-[#2C211B] border-2 border-[#CFBEAA] hover:border-[#7B6A5E] rounded-full px-5 py-2.5 bg-[#FAF5EE] transition-all shadow-2xs active:scale-95 cursor-pointer"
@@ -526,7 +685,6 @@ export default function Dashboard() {
         <aside className="lg:col-span-4 space-y-7">
           {/* Action Card: Tabbed Creation Panel */}
           <div className="bg-[#FAF5EE] rounded-3xl border-2 border-[#DFD3C3] p-7 shadow-sm">
-            {/* Tab Selector */}
             <div className="flex border-b-2 border-[#DFD3C3] mb-6">
               <button
                 type="button"
@@ -562,7 +720,7 @@ export default function Dashboard() {
                   <input
                     type="text"
                     className="w-full bg-[#FFFFFF] border-2 border-[#CFBEAA] rounded-2xl p-3 text-sm font-semibold text-[#2C211B] placeholder-[#AFA193] focus:border-[#4E2E1E] focus:ring-0 outline-none transition"
-                    placeholder="e.g. Design Critique or Pilates Studio"
+                    placeholder="e.g. COP4331 Presentation or Midterm"
                     value={eventTitle}
                     onChange={(e) => setEventTitle(e.target.value)}
                     required
@@ -607,9 +765,9 @@ export default function Dashboard() {
                       onChange={(e) => setEventCategory(e.target.value)}
                     >
                       <option value="Personal">Personal</option>
-                      <option value="Wellness">Wellness</option>
-                      <option value="Celebration">Celebration</option>
-                      <option value="Project">Project</option>
+                      <option value="School">School</option>
+                      <option value="Work">Work</option>
+                      <option value="Family/Friends">Family/Friends</option>
                       <option value="General">General</option>
                     </select>
                   </div>
@@ -628,7 +786,7 @@ export default function Dashboard() {
                           key={th.key}
                           type="button"
                           onClick={() => setEventAccent(th.key as any)}
-                          className={`h-9 rounded-xl flex items-center justify-center border-2 transition ${
+                          className={`h-9 rounded-xl flex items-center justify-center border-2 transition cursor-pointer ${
                             eventAccent === th.key
                               ? 'border-[#2C211B] scale-105 shadow-sm'
                               : 'border-transparent opacity-65 hover:opacity-100'
@@ -672,7 +830,7 @@ export default function Dashboard() {
                   <input
                     type="text"
                     className="w-full bg-[#FFFFFF] border-2 border-[#CFBEAA] rounded-2xl p-3 text-sm font-semibold text-[#2C211B] placeholder-[#AFA193] focus:border-[#355E48] focus:ring-0 outline-none transition"
-                    placeholder="e.g. Submit Portfolio PDF or Pick up supplies"
+                    placeholder="e.g. Submit project proposal"
                     value={reminderText}
                     onChange={(e) => setReminderText(e.target.value)}
                     required
@@ -685,7 +843,7 @@ export default function Dashboard() {
                   </label>
                   <input
                     type="date"
-                    className="w-full bg-[#FFFFFF] border-2 border-[#CFBEAA] rounded-2xl p-3 text-sm font-semibold text-[#2C211B] placeholder-[#AFA193] focus:border-[#355E48] focus:ring-0 outline-none transition"
+                    className="w-full bg-[#FFFFFF] border-2 border-[#CFBEAA] rounded-2xl p-3 text-sm font-semibold text-[#2C211B] focus:border-[#355E48] focus:ring-0 outline-none transition"
                     value={reminderDate}
                     onChange={(e) => setReminderDate(e.target.value)}
                   />
@@ -694,7 +852,6 @@ export default function Dashboard() {
                   <label className="block text-xs font-sans font-bold uppercase tracking-wider text-[#6C5B4F] mb-1.5">
                     Due Time (Optional)
                   </label>
-
                   <input
                     type="time"
                     className="w-full bg-[#FFFFFF] border-2 border-[#CFBEAA] rounded-2xl p-3 text-sm font-semibold text-[#2C211B] focus:border-[#355E48] focus:ring-0 outline-none transition"
@@ -702,7 +859,6 @@ export default function Dashboard() {
                     onChange={(e) => setReminderTime(e.target.value)}
                     disabled={!reminderDate}
                   />
-
                   {!reminderDate && (
                     <p className="text-xs text-[#9C8A7C] mt-1">
                       Select a due date first to add a time.
@@ -735,6 +891,56 @@ export default function Dashboard() {
             <div className="space-y-3">
               {reminders.map((r) => {
                 const styles = getAccentStyles(r.accent);
+                const isEditingThis = editingReminderId === r.id;
+
+                if (isEditingThis) {
+                  return (
+                    <form
+                      key={r.id}
+                      onSubmit={(e) => handleUpdateReminder(e, r.id)}
+                      className="p-3.5 rounded-2xl border-2 border-[#355E48] bg-[#FFFFFF] space-y-3 shadow-xs"
+                    >
+                      <input
+                        type="text"
+                        className="w-full bg-[#FAF5EE] border-2 border-[#CFBEAA] rounded-xl p-2 text-sm font-semibold text-[#2C211B] focus:border-[#355E48] outline-none"
+                        value={editReminderText}
+                        onChange={(e) => setEditReminderText(e.target.value)}
+                        required
+                      />
+                      <div className="grid grid-cols-2 gap-2">
+                        <input
+                          type="date"
+                          className="w-full bg-[#FAF5EE] border-2 border-[#CFBEAA] rounded-xl p-2 text-xs font-semibold text-[#2C211B] focus:border-[#355E48] outline-none"
+                          value={editReminderDate}
+                          onChange={(e) => setEditReminderDate(e.target.value)}
+                        />
+                        <input
+                          type="time"
+                          className="w-full bg-[#FAF5EE] border-2 border-[#CFBEAA] rounded-xl p-2 text-xs font-semibold text-[#2C211B] focus:border-[#355E48] outline-none"
+                          value={editReminderTime}
+                          onChange={(e) => setEditReminderTime(e.target.value)}
+                          disabled={!editReminderDate}
+                        />
+                      </div>
+                      <div className="flex justify-end gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setEditingReminderId(null)}
+                          className="px-3 py-1.5 text-xs font-bold uppercase tracking-wider text-[#6C5B4F] hover:text-[#2C211B] rounded-full cursor-pointer"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="submit"
+                          className="px-4 py-1.5 bg-[#355E48] hover:bg-[#284936] text-[#FAF5EE] text-xs font-bold uppercase tracking-wider rounded-full cursor-pointer"
+                        >
+                          Save
+                        </button>
+                      </div>
+                    </form>
+                  );
+                }
+
                 return (
                   <div
                     key={r.id}
@@ -768,6 +974,28 @@ export default function Dashboard() {
                         </div>
                       )}
                     </div>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          startEditingReminder(r);
+                        }}
+                        className="text-[11px] font-bold uppercase tracking-wider text-[#6C5B4F] hover:text-[#2C211B] px-2 py-1 rounded-lg hover:bg-[#ECE1D2] transition cursor-pointer"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteReminder(r.id);
+                        }}
+                        className="text-[11px] font-bold uppercase tracking-wider text-[#A85368] hover:text-[#632736] px-2 py-1 rounded-lg hover:bg-[#A85368]/10 transition cursor-pointer"
+                      >
+                        Del
+                      </button>
+                    </div>
                   </div>
                 );
               })}
@@ -775,9 +1003,8 @@ export default function Dashboard() {
           </div>
         </aside>
 
-        {/* ─── RIGHT COLUMN: The Calendar Grid (8 cols) - Elevated with Border & Depth ─── */}
+        {/* ─── RIGHT COLUMN: The Calendar Grid (8 cols) ─── */}
         <section className="lg:col-span-8 bg-[#FAF5EE] rounded-3xl border-2 border-[#D5C6B3] shadow-md overflow-hidden flex flex-col">
-          {/* Calendar Header with Controls */}
           <div className="p-7 border-b-2 border-[#D5C6B3] flex flex-col sm:flex-row items-center justify-between gap-4 bg-[#F2E8DC]">
             <div>
               <div className="flex items-center gap-3">
@@ -793,7 +1020,6 @@ export default function Dashboard() {
               </p>
             </div>
 
-            {/* Navigation Controls */}
             <div className="flex items-center gap-3">
               <div className="flex items-center bg-[#FFFFFF] border-2 border-[#CFBEAA] rounded-full p-1 shadow-xs">
                 <button
@@ -823,34 +1049,39 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* Days of Week Header */}
           <div className="grid grid-cols-7 border-b-2 border-[#D5C6B3] bg-[#EAE0D1] text-center">
-            {['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'].map((day) => (
-              <div key={day} className="py-3 text-[11px] font-sans font-black text-[#5C4A3E] uppercase tracking-wider">
-                <span className="hidden md:inline">{day}</span>
-                <span className="md:hidden">{day.slice(0, 3)}</span>
-              </div>
-            ))}
+            {['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'].map(
+              (day) => (
+                <div
+                  key={day}
+                  className="py-3 text-[11px] font-sans font-black text-[#5C4A3E] uppercase tracking-wider"
+                >
+                  <span className="hidden md:inline">{day}</span>
+                  <span className="md:hidden">{day.slice(0, 3)}</span>
+                </div>
+              )
+            )}
           </div>
 
-          {/* The Calendar Grid with Stronger 2px Grid Lines */}
           <div className="grid grid-cols-7 bg-[#D5C6B3] gap-[2px]">
-            {/* Start padding days */}
             {Array.from({ length: firstDayOfMonth }).map((_, i) => (
-              <div key={`empty-pre-${i}`} className="bg-[#FAF5EE]/60 min-h-[145px] p-2.5 opacity-40" />
+              <div
+                key={`empty-pre-${i}`}
+                className="bg-[#FAF5EE]/60 min-h-[145px] p-2.5 opacity-40"
+              />
             ))}
 
-            {/* Actual Month Days */}
             {Array.from({ length: daysInMonth }).map((_, i) => {
               const day = i + 1;
               const dayEvents = getEventsForDay(day);
-              // November 9, 2026 is Today
-              const isToday = currentYear === TODAY_YEAR && currentMonth === TODAY_MONTH && day === TODAY_DAY;
+              const isToday =
+                currentYear === TODAY_YEAR && currentMonth === TODAY_MONTH && day === TODAY_DAY;
 
               return (
                 <div
                   key={day}
-                  className={`bg-[#FFFFFF] min-h-[145px] p-2.5 flex flex-col justify-between transition hover:bg-[#FAF5EE] ${
+                  onClick={() => handleDayClick(day)}
+                  className={`bg-[#FFFFFF] min-h-[145px] p-2.5 flex flex-col justify-between transition hover:bg-[#FAF5EE] cursor-pointer ${
                     isToday ? 'bg-[#FDF9F2] ring-2 ring-[#4E2E1E]/40 shadow-inner' : ''
                   }`}
                 >
@@ -873,7 +1104,6 @@ export default function Dashboard() {
                     </span>
                   </div>
 
-                  {/* Events list within day cell */}
                   <div className="flex-1 space-y-1.5 overflow-y-auto max-h-[95px]">
                     {dayEvents.map((ev) => {
                       const styles = getAccentStyles(ev.accent);
@@ -881,7 +1111,10 @@ export default function Dashboard() {
                         <button
                           key={ev.id}
                           type="button"
-                          onClick={() => setSelectedEvent(ev)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openEventModal(ev);
+                          }}
                           className={`w-full text-left p-2 rounded-xl text-xs font-sans font-bold truncate block shadow-xs transition cursor-pointer ${styles.chip}`}
                         >
                           {ev.time && (
@@ -896,21 +1129,23 @@ export default function Dashboard() {
               );
             })}
 
-            {/* End padding days */}
             {Array.from({ length: (7 - ((firstDayOfMonth + daysInMonth) % 7)) % 7 }).map((_, i) => (
-              <div key={`empty-post-${i}`} className="bg-[#FAF5EE]/60 min-h-[145px] p-2.5 opacity-40" />
+              <div
+                key={`empty-post-${i}`}
+                className="bg-[#FAF5EE]/60 min-h-[145px] p-2.5 opacity-40"
+              />
             ))}
           </div>
         </section>
       </main>
 
       {/* ─────────────────────────────────────────────────────────────
-          3. EVENT DETAILS MODAL
+          3. EVENT DETAILS & EDIT MODAL
          ───────────────────────────────────────────────────────────── */}
       {selectedEvent && (
         <div
           className="fixed inset-0 bg-[#2C211B]/50 backdrop-blur-xs flex items-center justify-center z-50 p-4"
-          onClick={() => setSelectedEvent(null)}
+          onClick={closeEventModal}
         >
           <div
             className="bg-[#FAF5EE] rounded-3xl shadow-2xl max-w-lg w-full border-2 border-[#CFBEAA] overflow-hidden"
@@ -919,59 +1154,360 @@ export default function Dashboard() {
             <div className="p-6 border-b-2 border-[#DFD3C3] bg-[#F2E8DC] flex items-center justify-between">
               <div className="flex items-center gap-2.5">
                 <span
-                  className={`w-3 h-3 rounded-full ${getAccentStyles(selectedEvent.accent).dot}`}
+                  className={`w-3 h-3 rounded-full ${
+                    getAccentStyles(isEditingEvent ? editEventAccent : selectedEvent.accent).dot
+                  }`}
                 ></span>
-                <h4 className="text-xl font-serif font-black text-[#2C211B]">Event Details</h4>
+                <h4 className="text-xl font-serif font-black text-[#2C211B]">
+                  {isEditingEvent ? 'Edit Event' : 'Event Details'}
+                </h4>
               </div>
               <button
                 type="button"
-                onClick={() => setSelectedEvent(null)}
+                onClick={closeEventModal}
                 className="text-[#7B6A5E] hover:text-[#2C211B] w-8 h-8 flex items-center justify-center rounded-full hover:bg-[#ECE1D2] text-xl font-black transition cursor-pointer"
               >
                 &times;
               </button>
             </div>
-            <div className="p-7 space-y-5">
-              <div>
-                <span className="text-xs uppercase font-sans font-black tracking-wider text-[#9C8A7C] block mb-1">Title</span>
-                <div className="text-2xl font-serif font-black text-[#2C211B]">{selectedEvent.title}</div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <span className="text-xs uppercase font-sans font-black tracking-wider text-[#9C8A7C] block mb-1">Date & Time</span>
-                  <div className="text-sm font-sans font-black text-[#4E2E1E]">
-                    {selectedEvent.date} {selectedEvent.time ? `• ${selectedEvent.time}` : ''}
+
+            {isEditingEvent ? (
+              <form onSubmit={handleUpdateEvent}>
+                <div className="p-7 space-y-4">
+                  <div>
+                    <label className="block text-xs font-sans font-bold uppercase tracking-wider text-[#6C5B4F] mb-1.5">
+                      Event Title
+                    </label>
+                    <input
+                      type="text"
+                      className="w-full bg-[#FFFFFF] border-2 border-[#CFBEAA] rounded-2xl p-3 text-sm font-semibold text-[#2C211B] focus:border-[#4E2E1E] outline-none"
+                      value={editEventTitle}
+                      onChange={(e) => setEditEventTitle(e.target.value)}
+                      required
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-sans font-bold uppercase tracking-wider text-[#6C5B4F] mb-1.5">
+                        Date
+                      </label>
+                      <input
+                        type="date"
+                        className="w-full bg-[#FFFFFF] border-2 border-[#CFBEAA] rounded-2xl p-3 text-sm font-semibold text-[#2C211B] focus:border-[#4E2E1E] outline-none"
+                        value={editEventDate}
+                        onChange={(e) => setEditEventDate(e.target.value)}
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-sans font-bold uppercase tracking-wider text-[#6C5B4F] mb-1.5">
+                        Time (Optional)
+                      </label>
+                      <input
+                        type="text"
+                        className="w-full bg-[#FFFFFF] border-2 border-[#CFBEAA] rounded-2xl p-3 text-sm font-semibold text-[#2C211B] placeholder-[#AFA193] focus:border-[#4E2E1E] outline-none"
+                        placeholder="e.g. 2:00 PM"
+                        value={editEventTime}
+                        onChange={(e) => setEditEventTime(e.target.value)}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-sans font-bold uppercase tracking-wider text-[#6C5B4F] mb-1.5">
+                        Category
+                      </label>
+                      <select
+                        className="w-full bg-[#FFFFFF] border-2 border-[#CFBEAA] rounded-2xl p-3 text-sm font-bold text-[#2C211B] focus:border-[#4E2E1E] outline-none"
+                        value={editEventCategory}
+                        onChange={(e) => setEditEventCategory(e.target.value)}
+                      >
+                        <option value="Personal">Personal</option>
+                        <option value="School">School</option>
+                        <option value="Work">Work</option>
+                        <option value="Family/Friends">Family/Friends</option>
+                        <option value="General">General</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-sans font-bold uppercase tracking-wider text-[#6C5B4F] mb-1.5">
+                        Accent Color
+                      </label>
+                      <div className="grid grid-cols-4 gap-1.5 pt-1">
+                        {[
+                          { key: 'blue', label: 'Dark Blue', color: 'bg-[#2C3E55]' },
+                          { key: 'pink', label: 'Warm Pink', color: 'bg-[#A85368]' },
+                          { key: 'green', label: 'Dark Green', color: 'bg-[#355E48]' },
+                          { key: 'purple', label: 'Muted Purple', color: 'bg-[#5E4068]' },
+                        ].map((th) => (
+                          <button
+                            key={th.key}
+                            type="button"
+                            onClick={() => setEditEventAccent(th.key as any)}
+                            className={`h-9 rounded-xl flex items-center justify-center border-2 transition cursor-pointer ${
+                              editEventAccent === th.key
+                                ? 'border-[#2C211B] scale-105 shadow-sm'
+                                : 'border-transparent opacity-65 hover:opacity-100'
+                            } ${th.color}`}
+                            title={th.label}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-sans font-bold uppercase tracking-wider text-[#6C5B4F] mb-1.5">
+                      Notes
+                    </label>
+                    <textarea
+                      rows={3}
+                      className="w-full bg-[#FFFFFF] border-2 border-[#CFBEAA] rounded-2xl p-3 text-sm font-medium text-[#2C211B] focus:border-[#4E2E1E] outline-none resize-none"
+                      value={editEventNotes}
+                      onChange={(e) => setEditEventNotes(e.target.value)}
+                    />
                   </div>
                 </div>
-                <div>
-                  <span className="text-xs uppercase font-sans font-black tracking-wider text-[#9C8A7C] block mb-1">Category</span>
-                  <span
-                    className={`inline-block px-3.5 py-1 rounded-full text-xs font-sans font-black uppercase tracking-wider ${
-                      getAccentStyles(selectedEvent.accent).badge
-                    }`}
+
+                <div className="p-5 border-t-2 border-[#DFD3C3] bg-[#F2E8DC] flex justify-end gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setIsEditingEvent(false)}
+                    className="px-5 py-2 bg-[#FAF5EE] border-2 border-[#CFBEAA] hover:bg-[#ECE1D2] text-[#6C5B4F] font-sans font-black text-xs uppercase tracking-wider rounded-full transition cursor-pointer"
                   >
-                    {selectedEvent.category}
-                  </span>
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-6 py-2 bg-[#4E2E1E] hover:bg-[#3D2214] text-[#FAF5EE] font-sans font-black text-xs uppercase tracking-wider rounded-full transition cursor-pointer"
+                  >
+                    Save Changes
+                  </button>
                 </div>
-              </div>
-              {selectedEvent.notes && (
-                <div>
-                  <span className="text-xs uppercase font-sans font-black tracking-wider text-[#9C8A7C] block mb-1">Notes</span>
-                  <div className="p-4 bg-[#FFFFFF] rounded-2xl text-sm font-sans font-medium text-[#46382F] border-2 border-[#DFD3C3] whitespace-pre-wrap leading-relaxed">
-                    {selectedEvent.notes}
+              </form>
+            ) : (
+              <>
+                <div className="p-7 space-y-5">
+                  <div>
+                    <span className="text-xs uppercase font-sans font-black tracking-wider text-[#9C8A7C] block mb-1">
+                      Title
+                    </span>
+                    <div className="text-2xl font-serif font-black text-[#2C211B]">
+                      {selectedEvent.title}
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <span className="text-xs uppercase font-sans font-black tracking-wider text-[#9C8A7C] block mb-1">
+                        Date & Time
+                      </span>
+                      <div className="text-sm font-sans font-black text-[#4E2E1E]">
+                        {selectedEvent.date}{' '}
+                        {selectedEvent.time ? `• ${selectedEvent.time}` : ''}
+                      </div>
+                    </div>
+                    <div>
+                      <span className="text-xs uppercase font-sans font-black tracking-wider text-[#9C8A7C] block mb-1">
+                        Category
+                      </span>
+                      <span
+                        className={`inline-block px-3.5 py-1 rounded-full text-xs font-sans font-black uppercase tracking-wider ${
+                          getAccentStyles(selectedEvent.accent).badge
+                        }`}
+                      >
+                        {selectedEvent.category}
+                      </span>
+                    </div>
+                  </div>
+                  {selectedEvent.notes && (
+                    <div>
+                      <span className="text-xs uppercase font-sans font-black tracking-wider text-[#9C8A7C] block mb-1">
+                        Notes
+                      </span>
+                      <div className="p-4 bg-[#FFFFFF] rounded-2xl text-sm font-sans font-medium text-[#46382F] border-2 border-[#DFD3C3] whitespace-pre-wrap leading-relaxed">
+                        {selectedEvent.notes}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="p-5 border-t-2 border-[#DFD3C3] bg-[#F2E8DC] flex items-center justify-between">
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteEvent(selectedEvent.id)}
+                    className="px-5 py-2 bg-[#A85368]/15 border-2 border-[#A85368]/30 hover:bg-[#A85368] hover:text-white text-[#632736] font-sans font-black text-xs uppercase tracking-wider rounded-full transition cursor-pointer"
+                  >
+                    Delete
+                  </button>
+                  <div className="flex items-center gap-2.5">
+                    <button
+                      type="button"
+                      onClick={() => startEditingEvent(selectedEvent)}
+                      className="px-6 py-2 bg-[#4E2E1E] hover:bg-[#3D2214] text-[#FAF5EE] font-sans font-black text-xs uppercase tracking-wider rounded-full transition cursor-pointer"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      type="button"
+                      onClick={closeEventModal}
+                      className="px-6 py-2 bg-[#FAF5EE] border-2 border-[#CFBEAA] hover:bg-[#ECE1D2] text-[#4E2E1E] font-sans font-black text-xs uppercase tracking-wider rounded-full transition cursor-pointer"
+                    >
+                      Close
+                    </button>
                   </div>
                 </div>
-              )}
-            </div>
-            <div className="p-5 border-t-2 border-[#DFD3C3] bg-[#F2E8DC] flex justify-end">
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ─────────────────────────────────────────────────────────────
+          4. ADD EVENT MODAL (OPENED BY CLICKING A CALENDAR DAY)
+         ───────────────────────────────────────────────────────────── */}
+      {showAddEventModal && (
+        <div
+          className="fixed inset-0 bg-[#2C211B]/50 backdrop-blur-xs flex items-center justify-center z-50 p-4"
+          onClick={() => setShowAddEventModal(false)}
+        >
+          <div
+            className="bg-[#FAF5EE] rounded-3xl shadow-2xl max-w-lg w-full border-2 border-[#CFBEAA] overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-6 border-b-2 border-[#DFD3C3] bg-[#F2E8DC] flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <span className={`w-3 h-3 rounded-full ${getAccentStyles(eventAccent).dot}`}></span>
+                <h4 className="text-xl font-serif font-black text-[#2C211B]">Add Event</h4>
+              </div>
               <button
                 type="button"
-                onClick={() => setSelectedEvent(null)}
-                className="px-6 py-2 bg-[#FAF5EE] border-2 border-[#CFBEAA] hover:bg-[#ECE1D2] text-[#4E2E1E] font-sans font-black text-xs uppercase tracking-wider rounded-full transition cursor-pointer"
+                onClick={() => setShowAddEventModal(false)}
+                className="text-[#7B6A5E] hover:text-[#2C211B] w-8 h-8 flex items-center justify-center rounded-full hover:bg-[#ECE1D2] text-xl font-black transition cursor-pointer"
               >
-                Close
+                &times;
               </button>
             </div>
+
+            <form onSubmit={handleAddEvent}>
+              <div className="p-7 space-y-4">
+                <div>
+                  <label className="block text-xs font-sans font-bold uppercase tracking-wider text-[#6C5B4F] mb-1.5">
+                    Event Title
+                  </label>
+                  <input
+                    type="text"
+                    autoFocus
+                    className="w-full bg-[#FFFFFF] border-2 border-[#CFBEAA] rounded-2xl p-3 text-sm font-semibold text-[#2C211B] placeholder-[#AFA193] focus:border-[#4E2E1E] outline-none"
+                    placeholder="e.g. COP4331 Presentation or Midterm"
+                    value={eventTitle}
+                    onChange={(e) => setEventTitle(e.target.value)}
+                    required
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-sans font-bold uppercase tracking-wider text-[#6C5B4F] mb-1.5">
+                      Date
+                    </label>
+                    <input
+                      type="date"
+                      className="w-full bg-[#FFFFFF] border-2 border-[#CFBEAA] rounded-2xl p-3 text-sm font-semibold text-[#2C211B] focus:border-[#4E2E1E] outline-none"
+                      value={eventDate}
+                      onChange={(e) => setEventDate(e.target.value)}
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-sans font-bold uppercase tracking-wider text-[#6C5B4F] mb-1.5">
+                      Time (Optional)
+                    </label>
+                    <input
+                      type="text"
+                      className="w-full bg-[#FFFFFF] border-2 border-[#CFBEAA] rounded-2xl p-3 text-sm font-semibold text-[#2C211B] placeholder-[#AFA193] focus:border-[#4E2E1E] outline-none"
+                      placeholder="e.g. 2:00 PM"
+                      value={eventTime}
+                      onChange={(e) => setEventTime(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-sans font-bold uppercase tracking-wider text-[#6C5B4F] mb-1.5">
+                      Category
+                    </label>
+                    <select
+                      className="w-full bg-[#FFFFFF] border-2 border-[#CFBEAA] rounded-2xl p-3 text-sm font-bold text-[#2C211B] focus:border-[#4E2E1E] outline-none"
+                      value={eventCategory}
+                      onChange={(e) => setEventCategory(e.target.value)}
+                    >
+                      <option value="Personal">Personal</option>
+                      <option value="School">School</option>
+                      <option value="Work">Work</option>
+                      <option value="Family/Friends">Family/Friends</option>
+                      <option value="General">General</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-sans font-bold uppercase tracking-wider text-[#6C5B4F] mb-1.5">
+                      Accent Color
+                    </label>
+                    <div className="grid grid-cols-4 gap-1.5 pt-1">
+                      {[
+                        { key: 'blue', label: 'Dark Blue', color: 'bg-[#2C3E55]' },
+                        { key: 'pink', label: 'Warm Pink', color: 'bg-[#A85368]' },
+                        { key: 'green', label: 'Dark Green', color: 'bg-[#355E48]' },
+                        { key: 'purple', label: 'Muted Purple', color: 'bg-[#5E4068]' },
+                      ].map((th) => (
+                        <button
+                          key={th.key}
+                          type="button"
+                          onClick={() => setEventAccent(th.key as any)}
+                          className={`h-9 rounded-xl flex items-center justify-center border-2 transition cursor-pointer ${
+                            eventAccent === th.key
+                              ? 'border-[#2C211B] scale-105 shadow-sm'
+                              : 'border-transparent opacity-65 hover:opacity-100'
+                          } ${th.color}`}
+                          title={th.label}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-sans font-bold uppercase tracking-wider text-[#6C5B4F] mb-1.5">
+                    Notes
+                  </label>
+                  <textarea
+                    rows={2}
+                    className="w-full bg-[#FFFFFF] border-2 border-[#CFBEAA] rounded-2xl p-3 text-sm font-medium text-[#2C211B] placeholder-[#AFA193] focus:border-[#4E2E1E] outline-none resize-none"
+                    placeholder="Location, agenda, or details..."
+                    value={eventNotes}
+                    onChange={(e) => setEventNotes(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div className="p-5 border-t-2 border-[#DFD3C3] bg-[#F2E8DC] flex justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowAddEventModal(false)}
+                  className="px-5 py-2 bg-[#FAF5EE] border-2 border-[#CFBEAA] hover:bg-[#ECE1D2] text-[#6C5B4F] font-sans font-black text-xs uppercase tracking-wider rounded-full transition cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-6 py-2 bg-[#4E2E1E] hover:bg-[#3D2214] text-[#FAF5EE] font-sans font-black text-xs uppercase tracking-wider rounded-full transition cursor-pointer"
+                >
+                  Create Event
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
