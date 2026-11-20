@@ -1,7 +1,6 @@
 import { useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -51,7 +50,13 @@ export default function RegisterScreen() {
         email: email.trim(),
         password,
       });
-      Alert.alert('Account created!');
+      // Close Register and return to the Login screen underneath it, handing
+      // it a "just registered" flag and the email. dismissTo removes Register
+      // from the stack, so swiping back from Login can't reopen it.
+      router.dismissTo({
+        pathname: '/login',
+        params: { registered: '1', email: email.trim() },
+      });
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {

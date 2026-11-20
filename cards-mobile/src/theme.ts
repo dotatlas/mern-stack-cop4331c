@@ -12,6 +12,7 @@ export const colors = {
   tan: '#CFBEAA', // border-[#CFBEAA]
   tanDark: '#7B6A5E', // hover:border-[#7B6A5E]
   error: '#b91c1c', // text-red-700  (error messages)
+  success: '#15803d', // text-green-700  (success messages)
   // Tailwind's "stone" grays
   stone50: '#fafaf9',
   stone100: '#f5f5f4',
