@@ -64,6 +64,31 @@ export function getSampleReminders(): Reminder[] {
   ];
 }
 
+// Quick due-date choices for the Add reminder form.
+// days = how many days from today, or null for no due date.
+export const DUE_CHOICES = [
+  { label: 'No date', days: null },
+  { label: 'Today', days: 0 },
+  { label: 'Tomorrow', days: 1 },
+  { label: 'Next week', days: 7 },
+] as const;
+
+export type DueChoice = (typeof DUE_CHOICES)[number]['label'];
+
+// Builds a new, not-yet-done reminder from the form.
+// The due time is noon, which the web treats as "no time picked", so only
+// the date shows. The _id is temporary; the server will make real ones later.
+export function makeReminder(title: string, choice: DueChoice): Reminder {
+  const days = DUE_CHOICES.find((c) => c.label === choice)?.days ?? null;
+  return {
+    _id: `local-${Date.now()}`,
+    title,
+    dueAt: days === null ? null : dueIn(days, 12),
+    priority: 'medium', // the backend's default
+    completed: false,
+  };
+}
+
 // The date line under a reminder's title, the same way the web dashboard shows it:
 // "Nov 21, 2026 • 3:30 PM". Noon means "no time picked" on the web, so it shows
 // the date only. Returns null when there is no due date.

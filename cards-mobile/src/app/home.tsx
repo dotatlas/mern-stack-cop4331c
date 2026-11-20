@@ -7,13 +7,21 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { apiRequest } from '@/api';
 import { useAuth, type User } from '@/auth';
-import { formatDueAt, getSampleReminders, type Reminder } from '@/reminders';
+import {
+  DUE_CHOICES,
+  formatDueAt,
+  getSampleReminders,
+  makeReminder,
+  type DueChoice,
+  type Reminder,
+} from '@/reminders';
 import { colors, fonts } from '@/theme';
 
 export default function HomeScreen() {
@@ -24,6 +32,25 @@ export default function HomeScreen() {
   // changes this copy in memory (nothing is saved yet).
   const [reminders, setReminders] = useState<Reminder[]>(getSampleReminders);
   const doneCount = reminders.filter((r) => r.completed).length;
+
+  // The Add reminder form
+  const [newTitle, setNewTitle] = useState('');
+  const [newDue, setNewDue] = useState<DueChoice>('No date');
+  const [addError, setAddError] = useState<string | null>(null);
+  const [titleFocused, setTitleFocused] = useState(false);
+
+  function handleAddReminder() {
+    const title = newTitle.trim();
+    if (!title) {
+      setAddError('Please enter a title');
+      return;
+    }
+    // New ones go on top, like the web dashboard
+    setReminders((previous) => [makeReminder(title, newDue), ...previous]);
+    setNewTitle('');
+    setNewDue('No date');
+    setAddError(null);
+  }
 
   // Flip one reminder between done and not done
   function toggleReminder(id: string) {
@@ -67,7 +94,13 @@ export default function HomeScreen() {
         </Pressable>
       </View>
 
-      <ScrollView contentContainerStyle={styles.content}>
+      {/* handled: tapping Add / a chip works on the first tap even with the keyboard open.
+          automaticallyAdjustKeyboardInsets: on iPhone, lets you scroll the form above the keyboard. */}
+      <ScrollView
+        contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
+        automaticallyAdjustKeyboardInsets
+      >
         {/* Brand header (same as the login screen) */}
         <View style={styles.brand}>
           <View style={styles.logo}>
@@ -111,6 +144,54 @@ export default function HomeScreen() {
                 {doneCount} of {reminders.length} done
               </Text>
             </View>
+          </View>
+
+          {/* Add reminder form */}
+          <View style={styles.addForm}>
+            <TextInput
+              style={[styles.addInput, titleFocused && styles.addInputFocused]}
+              value={newTitle}
+              onChangeText={(text) => {
+                setNewTitle(text);
+                if (addError) setAddError(null);
+              }}
+              placeholder="Add a reminder..."
+              placeholderTextColor={colors.doneText}
+              returnKeyType="done"
+              onSubmitEditing={handleAddReminder}
+              onFocus={() => setTitleFocused(true)}
+              onBlur={() => setTitleFocused(false)}
+            />
+
+            {/* Due date: tap one choice */}
+            <View style={styles.chips}>
+              {DUE_CHOICES.map((c) => {
+                const selected = newDue === c.label;
+                return (
+                  <Pressable
+                    key={c.label}
+                    onPress={() => setNewDue(c.label)}
+                    accessibilityRole="radio"
+                    accessibilityState={{ selected }}
+                    style={[styles.chip, selected && styles.chipSelected]}
+                  >
+                    <Text style={[styles.chipText, selected && styles.chipTextSelected]}>
+                      {c.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+
+            {addError && <Text style={styles.addError}>{addError}</Text>}
+
+            <Pressable
+              onPress={handleAddReminder}
+              accessibilityRole="button"
+              style={({ pressed }) => [styles.addButton, pressed && styles.addButtonPressed]}
+            >
+              <Text style={styles.addButtonText}>Add</Text>
+            </Pressable>
           </View>
 
           <View style={styles.list}>
@@ -322,6 +403,76 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 0.6,
     color: colors.greenDark,
+  },
+
+  // Add reminder form (web inputs: white, border-2 tan, rounded; green Save button)
+  addForm: {
+    gap: 10,
+    marginBottom: 16,
+    paddingBottom: 16,
+    borderBottomWidth: 2,
+    borderBottomColor: colors.panelBorder,
+  },
+  addInput: {
+    fontFamily: fonts.bodySemiBold,
+    fontSize: 16,
+    color: colors.brownDark,
+    backgroundColor: colors.white,
+    borderWidth: 2,
+    borderColor: colors.tan,
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  addInputFocused: {
+    borderColor: colors.green,
+  },
+  chips: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  chip: {
+    borderWidth: 2,
+    borderColor: colors.tan,
+    backgroundColor: colors.white,
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  chipSelected: {
+    backgroundColor: colors.green,
+    borderColor: colors.green,
+  },
+  chipText: {
+    fontFamily: fonts.bodyBold,
+    fontSize: 12,
+    color: colors.brown,
+  },
+  chipTextSelected: {
+    color: colors.cream,
+  },
+  addError: {
+    fontFamily: fonts.bodyMedium,
+    fontSize: 14,
+    color: colors.error,
+  },
+  addButton: {
+    alignSelf: 'flex-end',
+    backgroundColor: colors.green,
+    borderRadius: 999,
+    paddingHorizontal: 20,
+    paddingVertical: 8,
+  },
+  addButtonPressed: {
+    backgroundColor: '#284936', // web hover:bg-[#284936]
+  },
+  addButtonText: {
+    fontFamily: fonts.bodyBold,
+    fontSize: 12,
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
+    color: colors.cream,
   },
 
   // One reminder row
