@@ -136,7 +136,7 @@ export default function LoginScreen() {
             </Pressable>
 
             <View style={styles.footer}>
-              <Pressable onPress={() => {}} hitSlop={8}>
+              <Pressable onPress={() => router.push('/register')} hitSlop={8}>
                 {({ pressed }) => (
                   <Text style={[styles.link, pressed && styles.linkPressed]}>
                     Need an account? Register here
