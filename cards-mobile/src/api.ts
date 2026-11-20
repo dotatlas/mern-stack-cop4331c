@@ -3,6 +3,11 @@ import { API_BASE_URL } from '@/config';
 // How long to wait for the server before giving up.
 const TIMEOUT_MS = 10000;
 
+// Where Create Account sends { firstName, lastName, email, password }.
+// The live server runs the older backend, which only has POST /users.
+// Change this to '/auth/register' once the newer backend is deployed.
+export const REGISTER_PATH = '/users';
+
 // The saved login token. The auth context (src/auth.tsx) keeps this up to date
 // so every request can send it without each screen passing it in.
 let authToken: string | null = null;

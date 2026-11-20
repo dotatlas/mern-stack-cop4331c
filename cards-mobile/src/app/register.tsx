@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
   Platform,
@@ -13,6 +14,7 @@ import {
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { apiRequest, REGISTER_PATH } from '@/api';
 import { colors, fonts } from '@/theme';
 
 type Field = 'firstName' | 'lastName' | 'email' | 'password';
@@ -23,18 +25,38 @@ export default function RegisterScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [focused, setFocused] = useState<Field | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // Let "next" on the keyboard jump to the following box
   const lastNameRef = useRef<React.ComponentRef<typeof TextInput>>(null);
   const emailRef = useRef<React.ComponentRef<typeof TextInput>>(null);
   const passwordRef = useRef<React.ComponentRef<typeof TextInput>>(null);
 
-  // Step 6a: no API call yet, just show what was typed
-  function handleRegister() {
-    Alert.alert(
-      'Create Account',
-      `First name: ${firstName}\nLast name: ${lastName}\nEmail: ${email}\nPassword: ${'•'.repeat(password.length)}`,
-    );
+  async function handleRegister() {
+    if (loading) return; // ignore extra taps / Enter presses while waiting
+
+    if (!firstName.trim() || !lastName.trim() || !email.trim() || !password) {
+      setError('Please fill in all fields');
+      return;
+    }
+
+    setError(null);
+    setLoading(true);
+    try {
+      // The server also sends back { token, user }, but we don't log in yet
+      await apiRequest(REGISTER_PATH, 'POST', {
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
+        email: email.trim(),
+        password,
+      });
+      Alert.alert('Account created!');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setLoading(false);
+    }
   }
 
   function goToLogin() {
@@ -143,11 +165,22 @@ export default function RegisterScreen() {
               />
             </View>
 
+            {error && <Text style={styles.error}>{error}</Text>}
+
             <Pressable
-              style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]}
+              style={({ pressed }) => [
+                styles.button,
+                pressed && styles.buttonPressed,
+                loading && styles.buttonDisabled,
+              ]}
               onPress={handleRegister}
+              disabled={loading}
             >
-              <Text style={styles.buttonText}>Create Account</Text>
+              {loading ? (
+                <ActivityIndicator color={colors.white} />
+              ) : (
+                <Text style={styles.buttonText}>Create Account</Text>
+              )}
             </Pressable>
 
             <View style={styles.footer}>
@@ -274,6 +307,18 @@ const styles = StyleSheet.create({
   },
   buttonPressed: {
     backgroundColor: colors.burgundyPressed,
+  },
+  buttonDisabled: {
+    opacity: 0.7,
+  },
+
+  // Error message under the inputs
+  error: {
+    fontFamily: fonts.bodyMedium,
+    fontSize: 14,
+    color: colors.error,
+    textAlign: 'center',
+    marginBottom: 8,
   },
   buttonText: {
     color: colors.white,
