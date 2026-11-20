@@ -11,6 +11,16 @@ export const colors = {
   brownDark: '#2C211B', // hover:text-[#2C211B]
   tan: '#CFBEAA', // border-[#CFBEAA]
   tanDark: '#7B6A5E', // hover:border-[#7B6A5E]
+  // Dashboard reminders panel
+  panelBorder: '#DFD3C3', // border-[#DFD3C3]
+  doneBg: 'rgba(236, 225, 210, 0.5)', // bg-[#ECE1D2]/50  (checked-off reminder)
+  doneBorder: 'rgba(207, 190, 170, 0.6)', // border-[#CFBEAA]/60
+  doneText: '#9C8A7C', // text-[#9C8A7C]  (struck-through title)
+  green: '#355E48', // accent for pending reminders
+  greenDark: '#1E3E2D', // text on green badges
+  greenSoft: 'rgba(53, 94, 72, 0.15)', // bg-[#355E48]/15
+  greenBorder: 'rgba(53, 94, 72, 0.3)', // border-[#355E48]/30
+  pink: '#A85368', // accent for completed reminders
   error: '#b91c1c', // text-red-700  (error messages)
   success: '#15803d', // text-green-700  (success messages)
   // Tailwind's "stone" grays
