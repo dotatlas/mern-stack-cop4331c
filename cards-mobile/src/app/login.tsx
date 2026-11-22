@@ -29,32 +29,27 @@ export default function LoginScreen() {
   const [focused, setFocused] = useState<'email' | 'password' | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
   const { login } = useAuth();
   const passwordRef = useRef<React.ComponentRef<typeof TextInput>>(null);
 
-  // Register sends us back here with ?registered=1&email=... after it
-  // creates an account. When those arrive, show the green message and
-  // fill in the new email so the user only has to type their password.
-  const params = useLocalSearchParams<{ registered?: string; email?: string }>();
+  // Register's "Back to Log In" button sends us back here with ?email=...
+  // Fill it in so the user only has to type their password.
+  const params = useLocalSearchParams<{ email?: string }>();
   useEffect(() => {
-    if (params.registered !== '1') return;
-    setEmail(params.email ?? '');
+    if (!params.email) return;
+    setEmail(params.email);
     setPassword('');
     setError(null);
-    setSuccess('Account created! Please log in.');
-  }, [params.registered, params.email]);
+  }, [params.email]);
 
   async function handleLogin() {
     if (loading) return; // ignore extra taps / Enter presses while waiting
 
     if (!email.trim() || !password) {
-      setSuccess(null);
       setError('Please enter your email and password');
       return;
     }
 
-    setSuccess(null);
     setError(null);
     setLoading(true);
     try {
@@ -93,8 +88,6 @@ export default function LoginScreen() {
           {/* Login card */}
           <View style={styles.card}>
             <Text style={styles.cardTitle}>Welcome Back</Text>
-
-            {success && <Text style={styles.success}>{success}</Text>}
 
             <View style={styles.field}>
               <Text style={styles.label}>Email Address</Text>
@@ -280,14 +273,6 @@ const styles = StyleSheet.create({
     color: colors.error,
     textAlign: 'center',
     marginBottom: 8,
-  },
-  // Green message after registering
-  success: {
-    fontFamily: fonts.bodyMedium,
-    fontSize: 14,
-    color: colors.success,
-    textAlign: 'center',
-    marginBottom: 16,
   },
   buttonText: {
     color: colors.white,

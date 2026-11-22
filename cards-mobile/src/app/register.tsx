@@ -18,6 +18,16 @@ import { colors, fonts } from '@/theme';
 
 type Field = 'firstName' | 'lastName' | 'email' | 'password';
 
+// Same minimum the server enforces
+const MIN_PASSWORD_LENGTH = 8;
+
+// What POST /auth/register sends back on success (201). No token: the user
+// has to verify their email before logging in.
+type RegisterResponse = {
+  message: string;
+  emailSent: boolean;
+};
+
 export default function RegisterScreen() {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -26,6 +36,8 @@ export default function RegisterScreen() {
   const [focused, setFocused] = useState<Field | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Set after a successful sign-up; switches to the "Check your email" screen
+  const [sentTo, setSentTo] = useState<string | null>(null);
 
   // Let "next" on the keyboard jump to the following box
   const lastNameRef = useRef<React.ComponentRef<typeof TextInput>>(null);
@@ -40,28 +52,41 @@ export default function RegisterScreen() {
       return;
     }
 
+    if (password.length < MIN_PASSWORD_LENGTH) {
+      setError(`Password must be at least ${MIN_PASSWORD_LENGTH} characters`);
+      return;
+    }
+
     setError(null);
     setLoading(true);
     try {
-      // The server also sends back { token, user }, but we don't log in yet
-      await apiRequest(REGISTER_PATH, 'POST', {
+      const data = await apiRequest<RegisterResponse>(REGISTER_PATH, 'POST', {
         firstName: firstName.trim(),
         lastName: lastName.trim(),
         email: email.trim(),
         password,
       });
-      // Close Register and return to the Login screen underneath it, handing
-      // it a "just registered" flag and the email. dismissTo removes Register
-      // from the stack, so swiping back from Login can't reopen it.
-      router.dismissTo({
-        pathname: '/login',
-        params: { registered: '1', email: email.trim() },
-      });
+      if (data.emailSent === false) {
+        // Account exists but no email went out: show the server's message
+        setError(data.message);
+        return;
+      }
+      setSentTo(email.trim());
     } catch (e) {
+      // 400 (missing field, bad email, short password), 409 (email taken) and
+      // 503 (account created but the email failed) all arrive here with the
+      // server's message, which is shown in red under the inputs.
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setLoading(false);
     }
+  }
+
+  // From the "Check your email" screen: close Register and return to the
+  // Login screen underneath it with the email filled in. dismissTo removes
+  // Register from the stack, so swiping back from Login can't reopen it.
+  function backToLoginWithEmail() {
+    router.dismissTo({ pathname: '/login', params: { email: sentTo ?? '' } });
   }
 
   function goToLogin() {
@@ -95,7 +120,24 @@ export default function RegisterScreen() {
             <Text style={styles.brandTitle}>Calendar</Text>
           </View>
 
-          {/* Register card */}
+          {sentTo !== null ? (
+            /* Shown after a successful sign-up */
+            <View style={styles.card}>
+              <Text style={styles.cardTitle}>Check your email</Text>
+              <Text style={styles.message}>
+                We sent a verification link to{' '}
+                <Text style={styles.messageEmail}>{sentTo}</Text>. Click it, then come
+                back and log in.
+              </Text>
+              <Pressable
+                style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]}
+                onPress={backToLoginWithEmail}
+              >
+                <Text style={styles.buttonText}>Back to Log In</Text>
+              </Pressable>
+            </View>
+          ) : (
+          /* Register card */
           <View style={styles.card}>
             <Text style={styles.cardTitle}>Create an Account</Text>
 
@@ -198,6 +240,7 @@ export default function RegisterScreen() {
               </Pressable>
             </View>
           </View>
+          )}
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -324,6 +367,18 @@ const styles = StyleSheet.create({
     color: colors.error,
     textAlign: 'center',
     marginBottom: 8,
+  },
+  // "Check your email" text
+  message: {
+    fontFamily: fonts.body,
+    fontSize: 15,
+    lineHeight: 22,
+    color: colors.stone800,
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  messageEmail: {
+    fontFamily: fonts.bodySemiBold,
   },
   buttonText: {
     color: colors.white,
