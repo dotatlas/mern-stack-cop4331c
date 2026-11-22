@@ -19,6 +19,6 @@ router.post('/', createUser);
 // GET /api/users/:userId - Fetch one user
 router.get('/:userId', requireAuth, requireSelf, getUser);
 
-router.delete('/:userId', deleteUser);
+//router.delete('/:userId', deleteUser);
 
 module.exports = router;
