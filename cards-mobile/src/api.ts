@@ -16,6 +16,17 @@ let authToken: string | null = null;
 // to "log out and go to the Login screen".
 let onUnauthorized: (() => void) | null = null;
 
+// Thrown when the server answers with an error. `status` is the HTTP code
+// (e.g. 403) so a screen can react to a specific error, not just show it.
+export class ApiError extends Error {
+  status: number;
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+  }
+}
+
 export function setAuthToken(token: string | null) {
   authToken = token;
 }
@@ -27,7 +38,8 @@ export function setUnauthorizedHandler(handler: (() => void) | null) {
 // Sends a JSON request to the backend and returns the parsed JSON reply.
 // Adds "Authorization: Bearer <token>" when the user is logged in.
 // Throws an Error with a readable message when anything goes wrong:
-//   - the server answered with an error  -> the server's { error } text
+//   - the server answered with an error  -> ApiError with the server's
+//                                           { error } text and the status code
 //   - the saved token was rejected (401) -> logs out, "Your session expired..."
 //   - no answer within 10 seconds        -> "Request timed out"
 //   - no network / server unreachable    -> "Could not reach the server..."
@@ -75,7 +87,10 @@ export async function apiRequest<T = unknown>(
   }
 
   if (!response.ok) {
-    throw new Error(data?.error ?? `Server responded with ${response.status}`);
+    throw new ApiError(
+      data?.error ?? `Server responded with ${response.status}`,
+      response.status,
+    );
   }
 
   return data as T;

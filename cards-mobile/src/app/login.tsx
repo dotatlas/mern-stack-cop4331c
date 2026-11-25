@@ -13,7 +13,7 @@ import {
 import { router, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { apiRequest } from '@/api';
+import { ApiError, apiRequest } from '@/api';
 import { useAuth, type User } from '@/auth';
 import { colors, fonts } from '@/theme';
 
@@ -29,6 +29,11 @@ export default function LoginScreen() {
   const [focused, setFocused] = useState<'email' | 'password' | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // True only when login failed with 403 "Please verify your email..."
+  const [needsVerification, setNeedsVerification] = useState(false);
+  const [resending, setResending] = useState(false);
+  const [resendSuccess, setResendSuccess] = useState<string | null>(null);
+  const [resendError, setResendError] = useState<string | null>(null);
   const { login } = useAuth();
   const passwordRef = useRef<React.ComponentRef<typeof TextInput>>(null);
 
@@ -40,11 +45,20 @@ export default function LoginScreen() {
     setEmail(params.email);
     setPassword('');
     setError(null);
+    clearResend();
   }, [params.email]);
+
+  // Hide the resend button and its messages
+  function clearResend() {
+    setNeedsVerification(false);
+    setResendSuccess(null);
+    setResendError(null);
+  }
 
   async function handleLogin() {
     if (loading) return; // ignore extra taps / Enter presses while waiting
 
+    clearResend();
     if (!email.trim() || !password) {
       setError('Please enter your email and password');
       return;
@@ -62,8 +76,27 @@ export default function LoginScreen() {
       router.replace('/home');
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
+      // 403 = right password, but the email isn't verified yet
+      setNeedsVerification(e instanceof ApiError && e.status === 403);
     } finally {
       setLoading(false);
+    }
+  }
+
+  // Ask the server to send the verification link again, to the typed email
+  async function handleResend() {
+    if (resending) return;
+
+    setResendSuccess(null);
+    setResendError(null);
+    setResending(true);
+    try {
+      await apiRequest('/auth/resend-verification', 'POST', { email: email.trim() });
+      setResendSuccess('Verification email sent. Check your inbox.');
+    } catch (e) {
+      setResendError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setResending(false);
     }
   }
 
@@ -128,6 +161,28 @@ export default function LoginScreen() {
             </View>
 
             {error && <Text style={styles.error}>{error}</Text>}
+
+            {needsVerification && (
+              <View style={styles.resend}>
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.resendButton,
+                    pressed && styles.resendButtonPressed,
+                    resending && styles.buttonDisabled,
+                  ]}
+                  onPress={handleResend}
+                  disabled={resending}
+                >
+                  {resending ? (
+                    <ActivityIndicator color={colors.burgundy} />
+                  ) : (
+                    <Text style={styles.resendButtonText}>Resend verification email</Text>
+                  )}
+                </Pressable>
+                {resendSuccess && <Text style={styles.success}>{resendSuccess}</Text>}
+                {resendError && <Text style={styles.error}>{resendError}</Text>}
+              </View>
+            )}
 
             <Pressable
               style={({ pressed }) => [
@@ -271,6 +326,34 @@ const styles = StyleSheet.create({
     fontFamily: fonts.bodyMedium,
     fontSize: 14,
     color: colors.error,
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  // "Resend verification email" (outlined, so it's clearly secondary to Log In)
+  resend: {
+    marginBottom: 8,
+  },
+  resendButton: {
+    borderWidth: 1,
+    borderColor: colors.burgundy,
+    borderRadius: 8,
+    paddingVertical: 10,
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  resendButtonPressed: {
+    backgroundColor: colors.stone50,
+  },
+  resendButtonText: {
+    color: colors.burgundy,
+    fontFamily: fonts.bodyMedium,
+    fontSize: 14,
+  },
+  // Green message after the email is resent
+  success: {
+    fontFamily: fonts.bodyMedium,
+    fontSize: 14,
+    color: colors.success,
     textAlign: 'center',
     marginBottom: 8,
   },
