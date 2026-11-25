@@ -158,6 +158,20 @@ export default function LoginScreen() {
                 onFocus={() => setFocused('password')}
                 onBlur={() => setFocused(null)}
               />
+              {/* Opens Forgot Password with whatever email is typed so far */}
+              <Pressable
+                style={styles.forgot}
+                onPress={() =>
+                  router.push({ pathname: '/forgot-password', params: { email: email.trim() } })
+                }
+                hitSlop={8}
+              >
+                {({ pressed }) => (
+                  <Text style={[styles.forgotText, pressed && styles.linkPressed]}>
+                    Forgot password?
+                  </Text>
+                )}
+              </Pressable>
             </View>
 
             {error && <Text style={styles.error}>{error}</Text>}
@@ -303,6 +317,16 @@ const styles = StyleSheet.create({
   },
   inputFocused: {
     borderColor: colors.burgundy,
+  },
+  // "Forgot password?" under the password box, on the right
+  forgot: {
+    alignSelf: 'flex-end',
+    marginTop: 8,
+  },
+  forgotText: {
+    fontFamily: fonts.bodyMedium,
+    fontSize: 13,
+    color: colors.stone500,
   },
 
   // Button
