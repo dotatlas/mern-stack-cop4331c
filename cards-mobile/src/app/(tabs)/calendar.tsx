@@ -18,33 +18,38 @@ import {
   eventAccent,
   eventsByDay,
   EVENTS_PATH,
+  formatDayTitle,
+  formatEventTime,
   monthGridRange,
   MONTH_NAMES,
   WEEKDAYS,
   type CalendarEvent,
   type EventsResponse,
 } from '@/calendar';
+import { formatDueTime, REMINDERS_PATH, type Reminder } from '@/reminders';
 import { colors, fonts } from '@/theme';
 
 // How many event labels fit in one day box; the rest become "+N"
 const MAX_LABELS = 2;
 
 // The Calendar tab: a month grid styled like the web dashboard's, showing the
-// user's events (read-only). Like the web, reminders aren't drawn on the grid.
+// user's events (read-only). Like the web, reminders aren't drawn on the grid,
+// but the panel under it lists the tapped day's events and reminders.
 export default function CalendarScreen() {
   const now = new Date();
   const todayKey = dayKey(now);
 
   // Which month is on screen (month is 0–11). Starts on this month.
   const [shown, setShown] = useState({ year: now.getFullYear(), month: now.getMonth() });
-  // The tapped day, as "YYYY-MM-DD", or null before any tap
-  const [selectedKey, setSelectedKey] = useState<string | null>(null);
+  // The tapped day, as "YYYY-MM-DD". Starts on today.
+  const [selectedKey, setSelectedKey] = useState(todayKey);
 
   const weeks = buildMonthGrid(shown.year, shown.month);
   const range = monthGridRange(shown.year, shown.month);
 
-  // Events for the visible grid, loaded from the server
+  // Events and reminders for the visible grid, loaded from the server
   const [events, setEvents] = useState<CalendarEvent[]>([]);
+  const [reminders, setReminders] = useState<Reminder[]>([]);
   const [loading, setLoading] = useState(false); // small spinner by the month title
   const [refreshing, setRefreshing] = useState(false); // pull-to-refresh spinner
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -53,7 +58,15 @@ export default function CalendarScreen() {
 
   const byDay = eventsByDay(events, range);
 
-  // Ask the server for every event that touches the visible grid, dimmed
+  // The selected day's events (earliest first) and reminders, for the panel
+  const dayEvents = [...(byDay[selectedKey] ?? [])].sort(
+    (a, b) => new Date(a.start).getTime() - new Date(b.start).getTime(),
+  );
+  const dayReminders = reminders.filter(
+    (r) => r.dueAt !== null && dayKey(new Date(r.dueAt)) === selectedKey,
+  );
+
+  // Ask the server for every event and reminder in the visible grid, dimmed
   // neighbor days included. apiRequest sends the login token.
   const loadEvents = useCallback(async (year: number, month: number) => {
     const id = ++loadId.current;
@@ -62,8 +75,16 @@ export default function CalendarScreen() {
     setLoadError(null);
     try {
       const query = `?from=${encodeURIComponent(from.toISOString())}&to=${encodeURIComponent(to.toISOString())}`;
-      const data = await apiRequest<EventsResponse>(EVENTS_PATH + query);
-      if (id === loadId.current) setEvents(data.events);
+      // Both at once. /reminders takes the same from/to (due dates in that
+      // span) and, unlike /events, replies with a plain array.
+      const [eventData, reminderData] = await Promise.all([
+        apiRequest<EventsResponse>(EVENTS_PATH + query),
+        apiRequest<Reminder[]>(REMINDERS_PATH + query),
+      ]);
+      if (id === loadId.current) {
+        setEvents(eventData.events);
+        setReminders(reminderData);
+      }
     } catch (e) {
       // Keep the events already showing and explain what went wrong
       if (id === loadId.current) setLoadError(e instanceof Error ? e.message : String(e));
@@ -89,17 +110,24 @@ export default function CalendarScreen() {
     loadEvents(shown.year, shown.month);
   }
 
+  // Show a month and select a day in it, so the panel always has data:
+  // today if it's this month, otherwise the 1st.
+  function showMonth(year: number, month: number) {
+    const today = new Date();
+    const isThisMonth = year === today.getFullYear() && month === today.getMonth();
+    setShown({ year, month });
+    setSelectedKey(dayKey(isThisMonth ? today : new Date(year, month, 1)));
+  }
+
   // Move by -1 / +1 month. new Date() handles going past January or December.
   function changeMonth(by: number) {
-    setShown(({ year, month }) => {
-      const d = new Date(year, month + by, 1);
-      return { year: d.getFullYear(), month: d.getMonth() };
-    });
+    const d = new Date(shown.year, shown.month + by, 1);
+    showMonth(d.getFullYear(), d.getMonth());
   }
 
   function goToToday() {
     const d = new Date();
-    setShown({ year: d.getFullYear(), month: d.getMonth() });
+    showMonth(d.getFullYear(), d.getMonth());
   }
 
   return (
@@ -181,16 +209,16 @@ export default function CalendarScreen() {
                 {week.map((cell) => {
                   const isToday = cell.key === todayKey;
                   const isSelected = cell.key === selectedKey;
-                  const dayEvents = byDay[cell.key] ?? [];
-                  const extra = dayEvents.length - MAX_LABELS;
+                  const cellEvents = byDay[cell.key] ?? [];
+                  const extra = cellEvents.length - MAX_LABELS;
                   return (
                     <Pressable
                       key={cell.key}
                       onPress={() => setSelectedKey(cell.key)}
                       accessibilityRole="button"
                       accessibilityLabel={
-                        dayEvents.length
-                          ? `${cell.key}, ${dayEvents.length} event${dayEvents.length === 1 ? '' : 's'}: ${dayEvents.map((ev) => ev.title).join(', ')}`
+                        cellEvents.length
+                          ? `${cell.key}, ${cellEvents.length} event${cellEvents.length === 1 ? '' : 's'}: ${cellEvents.map((ev) => ev.title).join(', ')}`
                           : cell.key
                       }
                       accessibilityState={{ selected: isSelected }}
@@ -216,9 +244,9 @@ export default function CalendarScreen() {
 
                       {/* Short labels in each event's color, like the web's chips
                           (light tint, colored bar on the left) */}
-                      {dayEvents.length > 0 && (
+                      {cellEvents.length > 0 && (
                         <View style={[styles.labels, !cell.inMonth && styles.labelsOutside]}>
-                          {dayEvents.slice(0, MAX_LABELS).map((ev) => {
+                          {cellEvents.slice(0, MAX_LABELS).map((ev) => {
                             const accent = eventAccent(ev.color);
                             return (
                               <View
@@ -246,6 +274,75 @@ export default function CalendarScreen() {
               </View>
             ))}
           </View>
+        </View>
+
+        {/* The selected day's details, styled like the Reminders panel */}
+        <View style={styles.dayPanel}>
+          <Text style={styles.dayTitle} accessibilityRole="header">
+            {formatDayTitle(selectedKey)}
+          </Text>
+
+          {/* Events: white cards with the event's color bar, like the grid labels */}
+          <Text style={styles.sectionLabel}>Events</Text>
+          {dayEvents.length === 0 ? (
+            <Text style={styles.empty}>No events this day</Text>
+          ) : (
+            <View style={styles.cards}>
+              {dayEvents.map((ev) => {
+                const accent = eventAccent(ev.color);
+                return (
+                  <View key={ev._id} style={[styles.eventCard, { borderLeftColor: accent.main }]}>
+                    <Text style={[styles.eventTime, { color: accent.text }]}>
+                      {formatEventTime(ev)}
+                    </Text>
+                    <Text style={styles.cardTitle}>{ev.title}</Text>
+                    {ev.location.trim() !== '' && (
+                      <Text style={styles.eventLocation}>{ev.location}</Text>
+                    )}
+                  </View>
+                );
+              })}
+            </View>
+          )}
+
+          {/* Reminders due this day (section hidden when there are none).
+              Read-only here; check off in the Reminders tab. */}
+          {dayReminders.length > 0 && (
+            <>
+              <Text style={[styles.sectionLabel, styles.sectionLabelSpaced]}>Reminders</Text>
+              <View style={styles.cards}>
+                {dayReminders.map((r) => {
+                  // Same colors as the Reminders tab: green while pending, pink once done
+                  const accent = r.completed ? colors.pink : colors.green;
+                  const dueTime = formatDueTime(r.dueAt);
+                  return (
+                    <View
+                      key={r._id}
+                      style={[styles.reminderCard, r.completed && styles.reminderCardDone]}
+                      accessible
+                      accessibilityLabel={`${r.title}${dueTime ? `, ${dueTime}` : ''}, ${r.completed ? 'done' : 'not done'}`}
+                    >
+                      <View
+                        style={[
+                          styles.checkbox,
+                          { borderColor: accent },
+                          r.completed && { backgroundColor: accent },
+                        ]}
+                      >
+                        {r.completed && <Text style={styles.checkmark}>✓</Text>}
+                      </View>
+                      <View style={styles.reminderBody}>
+                        <Text style={[styles.cardTitle, r.completed && styles.cardTitleDone]}>
+                          {r.title}
+                        </Text>
+                        {dueTime && <Text style={styles.reminderTime}>{dueTime}</Text>}
+                      </View>
+                    </View>
+                  );
+                })}
+              </View>
+            </>
+          )}
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -452,5 +549,114 @@ const styles = StyleSheet.create({
     fontSize: 9,
     color: colors.tanDark,
     paddingLeft: 2,
+  },
+
+  // Day panel (same look as the Reminders tab's panel)
+  dayPanel: {
+    width: '100%',
+    maxWidth: 520,
+    marginTop: 16,
+    backgroundColor: colors.cream,
+    borderRadius: 24,
+    borderWidth: 2,
+    borderColor: colors.panelBorder,
+    padding: 20,
+    boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)',
+  },
+  dayTitle: {
+    fontFamily: fonts.heading,
+    fontSize: 20,
+    color: colors.brownDark,
+    marginBottom: 12,
+  },
+  sectionLabel: {
+    fontFamily: fonts.bodyBold,
+    fontSize: 12,
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
+    color: colors.brown,
+    marginBottom: 8,
+  },
+  sectionLabelSpaced: {
+    marginTop: 16,
+  },
+  empty: {
+    fontFamily: fonts.bodySemiBold,
+    fontSize: 14,
+    color: colors.tanDark,
+  },
+  cards: {
+    gap: 10,
+  },
+  cardTitle: {
+    fontFamily: fonts.bodyBold,
+    fontSize: 15,
+    color: colors.brownDark,
+  },
+  cardTitleDone: {
+    color: colors.doneText,
+    textDecorationLine: 'line-through',
+  },
+
+  // One event: white card with a 4px colored bar (web chip: border-l-[4px])
+  eventCard: {
+    backgroundColor: colors.white,
+    borderRadius: 16,
+    borderWidth: 2,
+    borderColor: colors.panelBorder,
+    borderLeftWidth: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    gap: 2,
+  },
+  eventTime: {
+    fontFamily: fonts.bodyBold,
+    fontSize: 12,
+  },
+  eventLocation: {
+    fontFamily: fonts.bodySemiBold,
+    fontSize: 12,
+    color: colors.tanDark,
+  },
+
+  // One reminder (same look as a Reminders tab row, but not tappable)
+  reminderCard: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 14,
+    padding: 14,
+    borderRadius: 16,
+    borderWidth: 2,
+    borderColor: colors.panelBorder,
+    backgroundColor: colors.white,
+  },
+  reminderCardDone: {
+    backgroundColor: colors.doneBg,
+    borderColor: colors.doneBorder,
+    opacity: 0.6,
+  },
+  checkbox: {
+    width: 20,
+    height: 20,
+    marginTop: 1,
+    borderRadius: 5,
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  checkmark: {
+    color: colors.white,
+    fontFamily: fonts.bodyBold,
+    fontSize: 13,
+    lineHeight: 15,
+  },
+  reminderBody: {
+    flex: 1,
+  },
+  reminderTime: {
+    fontFamily: fonts.bodySemiBold,
+    fontSize: 12,
+    color: colors.tanDark,
+    marginTop: 2,
   },
 });

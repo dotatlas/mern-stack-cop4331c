@@ -88,6 +88,50 @@ export function buildMonthGrid(year: number, month: number): CalendarDay[][] {
   return weeks;
 }
 
+// "2026-11-25" back to a local Date at midnight
+export function dateFromKey(key: string): Date {
+  const [y, m, d] = key.split('-').map(Number);
+  return new Date(y, m - 1, d);
+}
+
+// Day panel title: "Wednesday, Nov 25" (the year is added if it isn't this year)
+export function formatDayTitle(key: string): string {
+  const date = dateFromKey(key);
+  const sameYear = date.getFullYear() === new Date().getFullYear();
+  return date.toLocaleDateString('en-US', {
+    weekday: 'long',
+    month: 'short',
+    day: 'numeric',
+    ...(sameYear ? {} : { year: 'numeric' }),
+  });
+}
+
+const time = (d: Date) => d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+const shortDate = (d: Date) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+
+// The time line on an event card:
+//   all day:       "All day"            (or "All day · Nov 29 – Dec 1" if it spans days)
+//   one day:       "9:00 AM – 10:00 AM" (or just "9:00 AM" if start = end)
+//   several days:  "Nov 29, 9:00 AM – Dec 1, 5:00 PM"
+export function formatEventTime(event: CalendarEvent): string {
+  const start = new Date(event.start);
+  const end = new Date(event.end);
+  // Same rule as eventsByDay: ending exactly at midnight doesn't count the new day
+  const endsAtMidnight =
+    end > start && end.getHours() === 0 && end.getMinutes() === 0 &&
+    end.getSeconds() === 0 && end.getMilliseconds() === 0;
+  const lastDay = endsAtMidnight ? new Date(end.getTime() - 1) : end;
+  const oneDay = dayKey(start) === dayKey(lastDay);
+
+  if (event.allDay) {
+    return oneDay ? 'All day' : `All day · ${shortDate(start)} – ${shortDate(lastDay)}`;
+  }
+  if (oneDay) {
+    return start.getTime() === end.getTime() ? time(start) : `${time(start)} – ${time(end)}`;
+  }
+  return `${shortDate(start)}, ${time(start)} – ${shortDate(end)}, ${time(end)}`;
+}
+
 // The time span the grid shows, dimmed neighbor days included:
 // from = midnight starting the first cell, to = midnight after the last cell.
 export function monthGridRange(year: number, month: number): { from: Date; to: Date } {

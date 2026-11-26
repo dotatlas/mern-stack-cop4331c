@@ -75,6 +75,15 @@ export type ReminderUpdate = {
   dueAt?: string | null;
 };
 
+// Just the time of a reminder's due date ("3:30 PM"), for lists already grouped
+// by day. null when there's no due date or no time was picked (noon, as on the web).
+export function formatDueTime(dueAt: string | null): string | null {
+  if (!dueAt) return null;
+  const d = new Date(dueAt);
+  if (d.getHours() === 12 && d.getMinutes() === 0) return null;
+  return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+}
+
 // The date line under a reminder's title, the same way the web dashboard shows it:
 // "Nov 21, 2026 • 3:30 PM". Noon means "no time picked" on the web, so it shows
 // the date only. Returns null when there is no due date.
