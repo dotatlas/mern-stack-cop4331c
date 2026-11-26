@@ -26,7 +26,9 @@ export const colors = {
   calHeader: '#F2E8DC', // bg-[#F2E8DC]  (month title bar)
   weekdayBg: '#EAE0D1', // bg-[#EAE0D1]  (Sun–Sat row)
   weekdayText: '#5C4A3E', // text-[#5C4A3E]
-  espresso: '#4E2E1E', // bg-[#4E2E1E]  (today's number, pressed Today button)
+  espresso: '#4E2E1E', // bg-[#4E2E1E]  (today's number, pressed Today button, Create Event)
+  espressoPressed: '#3D2214', // hover:bg-[#3D2214]  (pressed Create Event)
+  placeholder: '#AFA193', // placeholder-[#AFA193]  (event form)
   espressoRing: 'rgba(78, 46, 30, 0.4)', // ring-[#4E2E1E]/40  (today's cell)
   todayBg: '#FDF9F2', // bg-[#FDF9F2]  (today's cell)
   outsideBg: 'rgba(250, 245, 238, 0.6)', // bg-[#FAF5EE]/60  (days from next/previous month)

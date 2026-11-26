@@ -21,6 +21,55 @@ export type CalendarEvent = {
 
 export type EventsResponse = { events: CalendarEvent[] };
 
+// POST /api/events (login required). title, start and end are required; end
+// can't be before start. Replies 201 { message, event } (wrapped).
+export type NewEvent = {
+  title: string;
+  start: string; // ISO
+  end: string; // ISO
+  allDay: boolean;
+  location: string;
+  notes: string;
+  color: string;
+  category: string;
+};
+export type CreateEventResponse = { message: string; event: CalendarEvent };
+
+// The web's "Accent Color" swatches, in its order (Dark Blue is its default)
+export const EVENT_COLORS = [
+  { label: 'Dark Blue', value: '#2C3E55' },
+  { label: 'Warm Pink', value: '#A85368' },
+  { label: 'Dark Green', value: '#355E48' },
+  { label: 'Muted Purple', value: '#5E4068' },
+] as const;
+
+// The web's "Category" choices, in its order (Personal is its default)
+export const EVENT_CATEGORIES = ['Personal', 'School', 'Work', 'Family/Friends', 'General'] as const;
+
+// Reads a typed time: "2:00 PM", "2pm", "2:30p", "14:30", "9:05 am".
+// A bare number like "2" is rejected (AM or PM?). Returns null if unreadable.
+export function parseTime(text: string): { hours: number; minutes: number } | null {
+  const t = text.trim().toLowerCase().replace(/\./g, '');
+  // With AM/PM: hour 1–12, minutes optional
+  let m = t.match(/^(\d{1,2})(?::(\d{2}))?\s*([ap])m?$/);
+  if (m) {
+    const h = Number(m[1]);
+    const min = m[2] ? Number(m[2]) : 0;
+    if (h < 1 || h > 12 || min > 59) return null;
+    const pm = m[3] === 'p';
+    return { hours: (h % 12) + (pm ? 12 : 0), minutes: min }; // 12 AM = 0, 12 PM = 12
+  }
+  // 24-hour: "14:30"
+  m = t.match(/^(\d{1,2}):(\d{2})$/);
+  if (m) {
+    const h = Number(m[1]);
+    const min = Number(m[2]);
+    if (h > 23 || min > 59) return null;
+    return { hours: h, minutes: min };
+  }
+  return null;
+}
+
 // The web dashboard's four event colors. It shows any other color (including
 // the backend's default #007AFF) as blue, so mobile does the same.
 // main = left bar, text = label text, tint = label background (main at 12%).

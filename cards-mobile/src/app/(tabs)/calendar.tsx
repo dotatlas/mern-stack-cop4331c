@@ -1,4 +1,4 @@
-import { useFocusEffect } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -278,9 +278,21 @@ export default function CalendarScreen() {
 
         {/* The selected day's details, styled like the Reminders panel */}
         <View style={styles.dayPanel}>
-          <Text style={styles.dayTitle} accessibilityRole="header">
-            {formatDayTitle(selectedKey)}
-          </Text>
+          <View style={styles.dayHeader}>
+            <Text style={styles.dayTitle} accessibilityRole="header">
+              {formatDayTitle(selectedKey)}
+            </Text>
+            {/* Opens the event form for this day. Coming back here reloads
+                the calendar, so the new event shows up. */}
+            <Pressable
+              onPress={() => router.push({ pathname: '/new-event', params: { date: selectedKey } })}
+              accessibilityRole="button"
+              accessibilityLabel={`Add event on ${formatDayTitle(selectedKey)}`}
+              style={({ pressed }) => [styles.addEventButton, pressed && styles.addEventButtonPressed]}
+            >
+              <Text style={styles.addEventText}>+ Add event</Text>
+            </Pressable>
+          </View>
 
           {/* Events: white cards with the event's color bar, like the grid labels */}
           <Text style={styles.sectionLabel}>Events</Text>
@@ -563,11 +575,35 @@ const styles = StyleSheet.create({
     padding: 20,
     boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)',
   },
+  dayHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    marginBottom: 12,
+  },
   dayTitle: {
+    flexShrink: 1,
     fontFamily: fonts.heading,
     fontSize: 20,
     color: colors.brownDark,
-    marginBottom: 12,
+  },
+  // "+ Add event" (the web's espresso Create Event button, as a small pill)
+  addEventButton: {
+    backgroundColor: colors.espresso,
+    borderRadius: 999,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  addEventButtonPressed: {
+    backgroundColor: colors.espressoPressed,
+  },
+  addEventText: {
+    fontFamily: fonts.bodyBold,
+    fontSize: 12,
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
+    color: colors.cream,
   },
   sectionLabel: {
     fontFamily: fonts.bodyBold,
