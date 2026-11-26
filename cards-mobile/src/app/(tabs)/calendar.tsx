@@ -285,7 +285,7 @@ export default function CalendarScreen() {
             {/* Opens the event form for this day. Coming back here reloads
                 the calendar, so the new event shows up. */}
             <Pressable
-              onPress={() => router.push({ pathname: '/new-event', params: { date: selectedKey } })}
+              onPress={() => router.push({ pathname: '/event-form', params: { date: selectedKey } })}
               accessibilityRole="button"
               accessibilityLabel={`Add event on ${formatDayTitle(selectedKey)}`}
               style={({ pressed }) => [styles.addEventButton, pressed && styles.addEventButtonPressed]}
@@ -303,7 +303,18 @@ export default function CalendarScreen() {
               {dayEvents.map((ev) => {
                 const accent = eventAccent(ev.color);
                 return (
-                  <View key={ev._id} style={[styles.eventCard, { borderLeftColor: accent.main }]}>
+                  // Tap to edit. Coming back here reloads, so changes show up.
+                  <Pressable
+                    key={ev._id}
+                    onPress={() => router.push({ pathname: '/event-form', params: { id: ev._id } })}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${ev.title}, ${formatEventTime(ev)}${ev.location ? `, ${ev.location}` : ''}. Edit`}
+                    style={({ pressed }) => [
+                      styles.eventCard,
+                      { borderLeftColor: accent.main },
+                      pressed && styles.eventCardPressed,
+                    ]}
+                  >
                     <Text style={[styles.eventTime, { color: accent.text }]}>
                       {formatEventTime(ev)}
                     </Text>
@@ -311,7 +322,7 @@ export default function CalendarScreen() {
                     {ev.location.trim() !== '' && (
                       <Text style={styles.eventLocation}>{ev.location}</Text>
                     )}
-                  </View>
+                  </Pressable>
                 );
               })}
             </View>
@@ -644,6 +655,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 12,
     gap: 2,
+  },
+  eventCardPressed: {
+    borderColor: colors.tan, // left bar keeps its color (set inline)
   },
   eventTime: {
     fontFamily: fonts.bodyBold,

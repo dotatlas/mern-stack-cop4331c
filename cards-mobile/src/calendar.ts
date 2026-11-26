@@ -35,6 +35,32 @@ export type NewEvent = {
 };
 export type CreateEventResponse = { message: string; event: CalendarEvent };
 
+// GET /api/events/:id replies 200 { event }; 404 if it isn't this user's.
+export type EventResponse = { event: CalendarEvent };
+
+// PUT /api/events/:id changes only the fields sent (the rest stay as they
+// are). Replies 200 { message, event }; 404 if not found, 400 for bad values
+// (including an end before the start).
+export type EventUpdate = Partial<NewEvent>;
+
+// A time for the form's text boxes, in the format parseTime reads: "2:00 PM"
+export function formatTimeInput(d: Date): string {
+  const h = d.getHours();
+  const mm = String(d.getMinutes()).padStart(2, '0');
+  return `${h % 12 || 12}:${mm} ${h < 12 ? 'AM' : 'PM'}`;
+}
+
+// True if the event covers more than one day (same midnight rule as eventsByDay)
+export function spansDays(event: CalendarEvent): boolean {
+  const start = new Date(event.start);
+  const end = new Date(event.end);
+  const endsAtMidnight =
+    end > start && end.getHours() === 0 && end.getMinutes() === 0 &&
+    end.getSeconds() === 0 && end.getMilliseconds() === 0;
+  const last = endsAtMidnight ? new Date(end.getTime() - 1) : end;
+  return dayKey(start) !== dayKey(last);
+}
+
 // The web's "Accent Color" swatches, in its order (Dark Blue is its default)
 export const EVENT_COLORS = [
   { label: 'Dark Blue', value: '#2C3E55' },
