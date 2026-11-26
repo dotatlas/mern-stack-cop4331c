@@ -1,4 +1,40 @@
-// Month-grid math for the Calendar tab. Plain dates only (local time); no events yet.
+// Month-grid math and event helpers for the Calendar tab. All dates are local time.
+
+// GET /api/events?from=<ISO>&to=<ISO> (login required). Both are required.
+// Replies 200 { events: [...] } (wrapped, unlike /reminders), sorted by start,
+// with every event that overlaps the range: start < to AND end > from.
+export const EVENTS_PATH = '/events';
+
+// An event as the backend sends it (cards-backend/models/Event.js).
+// Dates are ISO strings. Server-only fields (userId) are left out.
+export type CalendarEvent = {
+  _id: string;
+  title: string;
+  start: string;
+  end: string; // never before start
+  allDay: boolean;
+  location: string;
+  notes?: string;
+  color: string; // "#RRGGBB", backend default "#007AFF"
+  category: string; // default "General"
+};
+
+export type EventsResponse = { events: CalendarEvent[] };
+
+// The web dashboard's four event colors. It shows any other color (including
+// the backend's default #007AFF) as blue, so mobile does the same.
+// main = left bar, text = label text, tint = label background (main at 12%).
+const ACCENTS: Record<string, { main: string; text: string }> = {
+  '#2C3E55': { main: '#2C3E55', text: '#1E2E40' }, // blue
+  '#A85368': { main: '#A85368', text: '#632736' }, // pink
+  '#355E48': { main: '#355E48', text: '#1E3E2D' }, // green
+  '#5E4068': { main: '#5E4068', text: '#3E2546' }, // purple
+};
+
+export function eventAccent(color: string) {
+  const accent = ACCENTS[color?.toUpperCase()] ?? ACCENTS['#2C3E55'];
+  return { ...accent, tint: `${accent.main}1F` }; // 1F hex = 12% opacity
+}
 
 export const MONTH_NAMES = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -50,4 +86,49 @@ export function buildMonthGrid(year: number, month: number): CalendarDay[][] {
     weeks.push(week);
   }
   return weeks;
+}
+
+// The time span the grid shows, dimmed neighbor days included:
+// from = midnight starting the first cell, to = midnight after the last cell.
+export function monthGridRange(year: number, month: number): { from: Date; to: Date } {
+  const leading = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const cellCount = Math.ceil((leading + daysInMonth) / 7) * 7;
+  return {
+    from: new Date(year, month, 1 - leading),
+    to: new Date(year, month, 1 - leading + cellCount),
+  };
+}
+
+// Groups events by the days they cover, as { "YYYY-MM-DD": [events] }.
+// A multi-day event is added to every day from its start day to its end day.
+// An end of exactly midnight doesn't count that new day (e.g. 10 PM–12 AM
+// is one day). Only days inside `range` are filled, so a very long event
+// can't make this loop run for years.
+export function eventsByDay(
+  events: CalendarEvent[],
+  range: { from: Date; to: Date },
+): Record<string, CalendarEvent[]> {
+  const byDay: Record<string, CalendarEvent[]> = {};
+  for (const event of events) {
+    const start = new Date(event.start);
+    const end = new Date(event.end);
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) continue;
+
+    // Last moment the event actually covers
+    const endsAtMidnight =
+      end > start && end.getHours() === 0 && end.getMinutes() === 0 &&
+      end.getSeconds() === 0 && end.getMilliseconds() === 0;
+    const last = endsAtMidnight ? new Date(end.getTime() - 1) : end;
+
+    // Walk day by day, starting at midnight of the start day (or the grid's first day)
+    let day = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+    if (day < range.from) day = new Date(range.from);
+    while (day <= last && day < range.to) {
+      const key = dayKey(day);
+      (byDay[key] ??= []).push(event);
+      day = new Date(day.getFullYear(), day.getMonth(), day.getDate() + 1);
+    }
+  }
+  return byDay;
 }

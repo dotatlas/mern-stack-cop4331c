@@ -1,11 +1,36 @@
-import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useFocusEffect } from 'expo-router';
+import { useCallback, useRef, useState } from 'react';
+import {
+  ActivityIndicator,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { buildMonthGrid, dayKey, MONTH_NAMES, WEEKDAYS } from '@/calendar';
+import { apiRequest } from '@/api';
+import {
+  buildMonthGrid,
+  dayKey,
+  eventAccent,
+  eventsByDay,
+  EVENTS_PATH,
+  monthGridRange,
+  MONTH_NAMES,
+  WEEKDAYS,
+  type CalendarEvent,
+  type EventsResponse,
+} from '@/calendar';
 import { colors, fonts } from '@/theme';
 
-// The Calendar tab: a month grid styled like the web dashboard's. No events yet.
+// How many event labels fit in one day box; the rest become "+N"
+const MAX_LABELS = 2;
+
+// The Calendar tab: a month grid styled like the web dashboard's, showing the
+// user's events (read-only). Like the web, reminders aren't drawn on the grid.
 export default function CalendarScreen() {
   const now = new Date();
   const todayKey = dayKey(now);
@@ -16,6 +41,53 @@ export default function CalendarScreen() {
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
 
   const weeks = buildMonthGrid(shown.year, shown.month);
+  const range = monthGridRange(shown.year, shown.month);
+
+  // Events for the visible grid, loaded from the server
+  const [events, setEvents] = useState<CalendarEvent[]>([]);
+  const [loading, setLoading] = useState(false); // small spinner by the month title
+  const [refreshing, setRefreshing] = useState(false); // pull-to-refresh spinner
+  const [loadError, setLoadError] = useState<string | null>(null);
+  // Counts loads so only the newest answer is used (e.g. tapping › quickly)
+  const loadId = useRef(0);
+
+  const byDay = eventsByDay(events, range);
+
+  // Ask the server for every event that touches the visible grid, dimmed
+  // neighbor days included. apiRequest sends the login token.
+  const loadEvents = useCallback(async (year: number, month: number) => {
+    const id = ++loadId.current;
+    const { from, to } = monthGridRange(year, month);
+    setLoading(true);
+    setLoadError(null);
+    try {
+      const query = `?from=${encodeURIComponent(from.toISOString())}&to=${encodeURIComponent(to.toISOString())}`;
+      const data = await apiRequest<EventsResponse>(EVENTS_PATH + query);
+      if (id === loadId.current) setEvents(data.events);
+    } catch (e) {
+      // Keep the events already showing and explain what went wrong
+      if (id === loadId.current) setLoadError(e instanceof Error ? e.message : String(e));
+    } finally {
+      if (id === loadId.current) {
+        setLoading(false);
+        setRefreshing(false);
+      }
+    }
+  }, []);
+
+  // Runs when the tab comes into view (so changes made in the Reminders tab or
+  // on the website show up), and again whenever the shown month changes.
+  useFocusEffect(
+    useCallback(() => {
+      loadEvents(shown.year, shown.month);
+    }, [loadEvents, shown.year, shown.month]),
+  );
+
+  // Pull down on the screen to reload
+  function handleRefresh() {
+    setRefreshing(true);
+    loadEvents(shown.year, shown.month);
+  }
 
   // Move by -1 / +1 month. new Date() handles going past January or December.
   function changeMonth(by: number) {
@@ -33,13 +105,30 @@ export default function CalendarScreen() {
   return (
     // No bottom edge: the tab bar already keeps clear of the home indicator
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView
+        contentContainerStyle={styles.content}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            tintColor={colors.burgundy} // iOS spinner color
+            colors={[colors.burgundy]} // Android spinner color
+          />
+        }
+      >
         <View style={styles.panel}>
           {/* Month title + ‹ Today › (web: the bar above the grid) */}
           <View style={styles.header}>
-            <Text style={styles.monthTitle} accessibilityRole="header">
-              {MONTH_NAMES[shown.month]} {shown.year}
-            </Text>
+            <View style={styles.titleRow}>
+              <Text style={styles.monthTitle} accessibilityRole="header">
+                {MONTH_NAMES[shown.month]} {shown.year}
+              </Text>
+              {/* Small spinner while events load (hidden during pull-to-refresh,
+                  which shows its own) */}
+              {loading && !refreshing && (
+                <ActivityIndicator size="small" color={colors.brown} style={styles.titleSpinner} />
+              )}
+            </View>
 
             <View style={styles.navPill}>
               <Pressable
@@ -72,6 +161,8 @@ export default function CalendarScreen() {
                 )}
               </Pressable>
             </View>
+
+            {loadError && <Text style={styles.error}>{loadError}</Text>}
           </View>
 
           {/* Sun–Sat */}
@@ -90,12 +181,18 @@ export default function CalendarScreen() {
                 {week.map((cell) => {
                   const isToday = cell.key === todayKey;
                   const isSelected = cell.key === selectedKey;
+                  const dayEvents = byDay[cell.key] ?? [];
+                  const extra = dayEvents.length - MAX_LABELS;
                   return (
                     <Pressable
                       key={cell.key}
                       onPress={() => setSelectedKey(cell.key)}
                       accessibilityRole="button"
-                      accessibilityLabel={cell.key}
+                      accessibilityLabel={
+                        dayEvents.length
+                          ? `${cell.key}, ${dayEvents.length} event${dayEvents.length === 1 ? '' : 's'}: ${dayEvents.map((ev) => ev.title).join(', ')}`
+                          : cell.key
+                      }
                       accessibilityState={{ selected: isSelected }}
                       style={({ pressed }) => [
                         styles.cell,
@@ -116,6 +213,33 @@ export default function CalendarScreen() {
                           {cell.day}
                         </Text>
                       </View>
+
+                      {/* Short labels in each event's color, like the web's chips
+                          (light tint, colored bar on the left) */}
+                      {dayEvents.length > 0 && (
+                        <View style={[styles.labels, !cell.inMonth && styles.labelsOutside]}>
+                          {dayEvents.slice(0, MAX_LABELS).map((ev) => {
+                            const accent = eventAccent(ev.color);
+                            return (
+                              <View
+                                key={ev._id}
+                                style={[
+                                  styles.label,
+                                  { backgroundColor: accent.tint, borderLeftColor: accent.main },
+                                ]}
+                              >
+                                <Text
+                                  style={[styles.labelText, { color: accent.text }]}
+                                  numberOfLines={1}
+                                >
+                                  {ev.title}
+                                </Text>
+                              </View>
+                            );
+                          })}
+                          {extra > 0 && <Text style={styles.moreText}>+{extra}</Text>}
+                        </View>
+                      )}
                     </Pressable>
                   );
                 })}
@@ -159,6 +283,21 @@ const styles = StyleSheet.create({
     backgroundColor: colors.calHeader,
     borderBottomWidth: 2,
     borderBottomColor: colors.calBorder,
+  },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  // Absolutely placed so the title stays centered whether or not it shows
+  titleSpinner: {
+    position: 'absolute',
+    right: -28,
+  },
+  error: {
+    fontFamily: fonts.bodyMedium,
+    fontSize: 14,
+    color: colors.error,
+    textAlign: 'center',
   },
   monthTitle: {
     fontFamily: fonts.headingBold,
@@ -286,5 +425,32 @@ const styles = StyleSheet.create({
   },
   dayTextOutside: {
     opacity: 0.4, // web: opacity-40 on the cells outside the month
+  },
+
+  // Event labels (web chip: bg-[accent]/12 border-l-[4px] border-[accent]
+  // rounded-xl text-xs font-bold, shrunk to fit a phone-width day box)
+  labels: {
+    alignSelf: 'stretch', // full box width (the cell lines its number up on the right)
+    gap: 2,
+    marginTop: 2,
+  },
+  labelsOutside: {
+    opacity: 0.4,
+  },
+  label: {
+    borderLeftWidth: 3,
+    borderRadius: 4,
+    paddingHorizontal: 2,
+    paddingVertical: 1,
+  },
+  labelText: {
+    fontFamily: fonts.bodyBold,
+    fontSize: 9,
+  },
+  moreText: {
+    fontFamily: fonts.bodyBold,
+    fontSize: 9,
+    color: colors.tanDark,
+    paddingLeft: 2,
   },
 });
