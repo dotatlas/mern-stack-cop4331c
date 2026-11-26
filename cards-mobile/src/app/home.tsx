@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Platform,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -29,8 +30,8 @@ export default function HomeScreen() {
   const { user, logout } = useAuth();
   const [checking, setChecking] = useState(false);
 
-  // The list on screen, loaded from the server. Adding and checking off
-  // both save to the server.
+  // The list on screen, loaded from the server. Adding, checking off and
+  // deleting all save to the server.
   const [reminders, setReminders] = useState<Reminder[]>([]);
   const doneCount = reminders.filter((r) => r.completed).length;
   const [loading, setLoading] = useState(true); // first load: big spinner
@@ -109,7 +110,8 @@ export default function HomeScreen() {
   // Reminders whose check-off request is still on its way. A ref (not state)
   // so a fast second tap sees it right away, before the screen redraws.
   const pendingToggles = useRef(new Set<string>());
-  const [toggleError, setToggleError] = useState<string | null>(null);
+  // Red message above the list when checking off or deleting fails
+  const [listError, setListError] = useState<string | null>(null);
 
   // Set one reminder's completed value on just that one item, keeping the list order
   function setCompleted(id: string, completed: boolean) {
@@ -124,7 +126,7 @@ export default function HomeScreen() {
 
     // The server sets the value we send (it doesn't flip it), so send the new value
     const wanted = !r.completed;
-    setToggleError(null);
+    setListError(null);
     setCompleted(r._id, wanted);
     try {
       const saved = await apiRequest<Reminder>(
@@ -136,9 +138,44 @@ export default function HomeScreen() {
       setReminders((previous) => previous.map((x) => (x._id === saved._id ? saved : x)));
     } catch (e) {
       setCompleted(r._id, r.completed); // put the checkmark back
-      setToggleError(e instanceof Error ? e.message : String(e));
+      setListError(e instanceof Error ? e.message : String(e));
     } finally {
       pendingToggles.current.delete(r._id);
+    }
+  }
+
+  // "Del" button: ask first, like the web's "Delete this reminder?" popup
+  function confirmDelete(r: Reminder) {
+    // Alert buttons do nothing in a browser, so use the browser's own popup there
+    if (Platform.OS === 'web') {
+      if (window.confirm('Delete this reminder?')) deleteReminder(r);
+      return;
+    }
+    Alert.alert('Delete this reminder?', r.title, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete', style: 'destructive', onPress: () => deleteReminder(r) },
+    ]);
+  }
+
+  // Take it off the list right away, then delete it on the server.
+  // If that fails, put it back where it was.
+  async function deleteReminder(r: Reminder) {
+    const index = reminders.findIndex((x) => x._id === r._id);
+    if (index === -1) return; // already gone
+
+    setListError(null);
+    setReminders((previous) => previous.filter((x) => x._id !== r._id));
+    try {
+      // Replies 200 { message }; 404 if it's already gone, 400 for a bad id
+      await apiRequest(`${REMINDERS_PATH}/${r._id}`, 'DELETE');
+    } catch (e) {
+      setReminders((previous) => {
+        if (previous.some((x) => x._id === r._id)) return previous; // a refresh brought it back
+        const restored = [...previous];
+        restored.splice(Math.min(index, restored.length), 0, r);
+        return restored;
+      });
+      setListError(e instanceof Error ? e.message : String(e));
     }
   }
 
@@ -298,7 +335,7 @@ export default function HomeScreen() {
           </View>
 
           {loadError && <Text style={styles.loadError}>{loadError}</Text>}
-          {toggleError && <Text style={styles.loadError}>{toggleError}</Text>}
+          {listError && <Text style={styles.loadError}>{listError}</Text>}
 
           {loading ? (
             <ActivityIndicator style={styles.listSpinner} size="large" color={colors.green} />
@@ -345,6 +382,20 @@ export default function HomeScreen() {
                       </View>
                     )}
                   </View>
+
+                  {/* Delete, like the web's "Del". Its own Pressable, so tapping it
+                      doesn't also check off the row. */}
+                  <Pressable
+                    onPress={() => confirmDelete(r)}
+                    hitSlop={8}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Delete reminder: ${r.title}`}
+                    style={({ pressed }) => [styles.deleteButton, pressed && styles.deleteButtonPressed]}
+                  >
+                    {({ pressed }) => (
+                      <Text style={[styles.deleteText, pressed && styles.deleteTextPressed]}>Del</Text>
+                    )}
+                  </Pressable>
                 </Pressable>
               );
             })}
@@ -673,5 +724,26 @@ const styles = StyleSheet.create({
     fontFamily: fonts.bodySemiBold,
     fontSize: 12,
     color: colors.tanDark,
+  },
+
+  // "Del" (web: text-[11px] font-bold uppercase tracking-wider text-[#A85368]
+  // px-2 py-1 rounded-lg hover:bg-[#A85368]/10 hover:text-[#632736])
+  deleteButton: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  deleteButtonPressed: {
+    backgroundColor: colors.pinkSoft,
+  },
+  deleteText: {
+    fontFamily: fonts.bodyBold,
+    fontSize: 11,
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
+    color: colors.pink,
+  },
+  deleteTextPressed: {
+    color: colors.pinkDark,
   },
 });

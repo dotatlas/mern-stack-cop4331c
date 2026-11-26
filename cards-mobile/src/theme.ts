@@ -20,7 +20,9 @@ export const colors = {
   greenDark: '#1E3E2D', // text on green badges
   greenSoft: 'rgba(53, 94, 72, 0.15)', // bg-[#355E48]/15
   greenBorder: 'rgba(53, 94, 72, 0.3)', // border-[#355E48]/30
-  pink: '#A85368', // accent for completed reminders
+  pink: '#A85368', // accent for completed reminders; also the "Del" button text
+  pinkDark: '#632736', // hover:text-[#632736]  (pressed "Del")
+  pinkSoft: 'rgba(168, 83, 104, 0.1)', // hover:bg-[#A85368]/10  (pressed "Del")
   error: '#b91c1c', // text-red-700  (error messages)
   success: '#15803d', // text-green-700  (success messages)
   // Tailwind's "stone" grays
