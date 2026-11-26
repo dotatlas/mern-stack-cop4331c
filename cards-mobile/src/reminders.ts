@@ -43,16 +43,37 @@ export type NewReminder = {
   dueAt: string | null;
 };
 
-// Builds the request body from the form.
-// The due time is noon, which the web treats as "no time picked", so only
-// the date shows.
-export function makeNewReminder(title: string, choice: DueChoice): NewReminder {
+// The dueAt a chip stands for: noon on that day, which the web treats as
+// "no time picked" (so only the date shows), or null for "No date".
+export function dueAtForChoice(choice: DueChoice): string | null {
   const days = DUE_CHOICES.find((c) => c.label === choice)?.days ?? null;
-  return {
-    title,
-    dueAt: days === null ? null : dueIn(days, 12),
-  };
+  return days === null ? null : dueIn(days, 12);
 }
+
+// Builds the POST request body from the form.
+export function makeNewReminder(title: string, choice: DueChoice): NewReminder {
+  return { title, dueAt: dueAtForChoice(choice) };
+}
+
+// Which chip an existing reminder's due date matches, for filling the form
+// when editing. null = none of them (e.g. a date set on the web with a time,
+// or "Today" picked on an earlier day).
+export function dueChoiceFor(dueAt: string | null): DueChoice | null {
+  const match = DUE_CHOICES.find((c) => {
+    if (c.days === null) return dueAt === null;
+    return dueAt !== null && new Date(dueAt).getTime() === new Date(dueIn(c.days, 12)).getTime();
+  });
+  return match?.label ?? null;
+}
+
+// What the edit form sends to PUT /api/reminders/:id. Only the fields given
+// are changed. Leave dueAt out when it didn't change: the server restarts the
+// reminder's notifications whenever dueAt is sent, even with the same date.
+// Replies 200 with the updated reminder.
+export type ReminderUpdate = {
+  title: string;
+  dueAt?: string | null;
+};
 
 // The date line under a reminder's title, the same way the web dashboard shows it:
 // "Nov 21, 2026 • 3:30 PM". Noon means "no time picked" on the web, so it shows

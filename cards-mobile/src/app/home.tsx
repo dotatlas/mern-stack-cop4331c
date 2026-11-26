@@ -18,11 +18,14 @@ import { apiRequest } from '@/api';
 import { useAuth, type User } from '@/auth';
 import {
   DUE_CHOICES,
+  dueAtForChoice,
+  dueChoiceFor,
   formatDueAt,
   makeNewReminder,
   REMINDERS_PATH,
   type DueChoice,
   type Reminder,
+  type ReminderUpdate,
 } from '@/reminders';
 import { colors, fonts } from '@/theme';
 
@@ -30,8 +33,8 @@ export default function HomeScreen() {
   const { user, logout } = useAuth();
   const [checking, setChecking] = useState(false);
 
-  // The list on screen, loaded from the server. Adding, checking off and
-  // deleting all save to the server.
+  // The list on screen, loaded from the server. Adding, editing, checking off
+  // and deleting all save to the server.
   const [reminders, setReminders] = useState<Reminder[]>([]);
   const doneCount = reminders.filter((r) => r.completed).length;
   const [loading, setLoading] = useState(true); // first load: big spinner
@@ -70,16 +73,46 @@ export default function HomeScreen() {
     loadReminders();
   }
 
-  // The Add reminder form
+  // The form at the top. It adds a new reminder, or edits one when `editing` is set.
   const [newTitle, setNewTitle] = useState('');
-  const [newDue, setNewDue] = useState<DueChoice>('No date');
+  // 'current' = keep the edited reminder's own date (shown when no chip matches it)
+  const [newDue, setNewDue] = useState<DueChoice | 'current'>('No date');
   const [addError, setAddError] = useState<string | null>(null);
   const [titleFocused, setTitleFocused] = useState(false);
-  const [adding, setAdding] = useState(false); // spinner on the Add button
+  const [saving, setSaving] = useState(false); // spinner on the Add / Save button
+  const [editing, setEditing] = useState<Reminder | null>(null);
+  const scrollRef = useRef<React.ComponentRef<typeof ScrollView>>(null);
+  const titleRef = useRef<React.ComponentRef<typeof TextInput>>(null);
 
-  // Save the new reminder on the server, then show the copy it sends back
-  async function handleAddReminder() {
-    if (adding) return; // ignore extra taps / Enter presses while waiting
+  // The chip the edited reminder started on, so Save knows if the date changed
+  const editingStartChoice = editing ? (dueChoiceFor(editing.dueAt) ?? 'current') : null;
+
+  function clearForm() {
+    setNewTitle('');
+    setNewDue('No date');
+    setAddError(null);
+  }
+
+  // "Edit" on a row: fill the form with that reminder and scroll up to it
+  function startEditing(r: Reminder) {
+    if (saving) return;
+    setEditing(r);
+    setNewTitle(r.title);
+    setNewDue(dueChoiceFor(r.dueAt) ?? 'current');
+    setAddError(null);
+    scrollRef.current?.scrollTo({ y: 0, animated: true });
+    titleRef.current?.focus();
+  }
+
+  function cancelEditing() {
+    if (saving) return;
+    setEditing(null);
+    clearForm();
+  }
+
+  // Add or Save, depending on the form's mode
+  async function handleSubmit() {
+    if (saving) return; // ignore extra taps / Enter presses while waiting
 
     const title = newTitle.trim();
     if (!title) {
@@ -88,22 +121,37 @@ export default function HomeScreen() {
     }
 
     setAddError(null);
-    setAdding(true);
+    setSaving(true);
     try {
-      const saved = await apiRequest<Reminder>(
-        REMINDERS_PATH,
-        'POST',
-        makeNewReminder(title, newDue),
-      );
-      // New ones go on top, like the web dashboard. The server's copy has the real _id.
-      setReminders((previous) => [saved, ...previous]);
-      setNewTitle('');
-      setNewDue('No date');
+      if (editing) {
+        const update: ReminderUpdate = { title };
+        // Only send dueAt if the user picked a different chip (see ReminderUpdate)
+        if (newDue !== editingStartChoice && newDue !== 'current') {
+          update.dueAt = dueAtForChoice(newDue);
+        }
+        const saved = await apiRequest<Reminder>(
+          `${REMINDERS_PATH}/${editing._id}`,
+          'PUT',
+          update,
+        );
+        // Swap in the server's copy, in the same spot
+        setReminders((previous) => previous.map((x) => (x._id === saved._id ? saved : x)));
+        setEditing(null);
+      } else {
+        const saved = await apiRequest<Reminder>(
+          REMINDERS_PATH,
+          'POST',
+          makeNewReminder(title, newDue === 'current' ? 'No date' : newDue),
+        );
+        // New ones go on top, like the web dashboard. The server's copy has the real _id.
+        setReminders((previous) => [saved, ...previous]);
+      }
+      clearForm();
     } catch (e) {
-      // Leave the title and due date as typed so the user can just tap Add again
+      // Leave the form as typed so the user can just tap Add / Save again
       setAddError(e instanceof Error ? e.message : String(e));
     } finally {
-      setAdding(false);
+      setSaving(false);
     }
   }
 
@@ -163,6 +211,12 @@ export default function HomeScreen() {
     const index = reminders.findIndex((x) => x._id === r._id);
     if (index === -1) return; // already gone
 
+    // Deleting the one in the edit form: stop editing it
+    if (editing?._id === r._id && !saving) {
+      setEditing(null);
+      clearForm();
+    }
+
     setListError(null);
     setReminders((previous) => previous.filter((x) => x._id !== r._id));
     try {
@@ -217,6 +271,7 @@ export default function HomeScreen() {
       {/* handled: tapping Add / a chip works on the first tap even with the keyboard open.
           automaticallyAdjustKeyboardInsets: on iPhone, lets you scroll the form above the keyboard. */}
       <ScrollView
+        ref={scrollRef}
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
         automaticallyAdjustKeyboardInsets
@@ -276,25 +331,40 @@ export default function HomeScreen() {
             )}
           </View>
 
-          {/* Add reminder form */}
+          {/* Add / edit reminder form */}
           <View style={styles.addForm}>
+            {editing && <Text style={styles.editingLabel}>Editing reminder</Text>}
             <TextInput
+              ref={titleRef}
               style={[styles.addInput, titleFocused && styles.addInputFocused]}
               value={newTitle}
               onChangeText={(text) => {
                 setNewTitle(text);
                 if (addError) setAddError(null);
               }}
-              placeholder="Add a reminder..."
+              placeholder={editing ? 'Reminder title' : 'Add a reminder...'}
               placeholderTextColor={colors.doneText}
               returnKeyType="done"
-              onSubmitEditing={handleAddReminder}
+              onSubmitEditing={handleSubmit}
               onFocus={() => setTitleFocused(true)}
               onBlur={() => setTitleFocused(false)}
             />
 
             {/* Due date: tap one choice */}
             <View style={styles.chips}>
+              {/* When editing a reminder whose date no chip matches, offer to keep it */}
+              {editingStartChoice === 'current' && editing?.dueAt && (
+                <Pressable
+                  onPress={() => setNewDue('current')}
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected: newDue === 'current' }}
+                  style={[styles.chip, newDue === 'current' && styles.chipSelected]}
+                >
+                  <Text style={[styles.chipText, newDue === 'current' && styles.chipTextSelected]}>
+                    {formatDueAt(editing.dueAt)}
+                  </Text>
+                </Pressable>
+              )}
               {DUE_CHOICES.map((c) => {
                 const selected = newDue === c.label;
                 return (
@@ -315,23 +385,41 @@ export default function HomeScreen() {
 
             {addError && <Text style={styles.addError}>{addError}</Text>}
 
-            <Pressable
-              onPress={handleAddReminder}
-              disabled={adding}
-              accessibilityRole="button"
-              accessibilityState={{ busy: adding, disabled: adding }}
-              style={({ pressed }) => [
-                styles.addButton,
-                pressed && styles.addButtonPressed,
-                adding && styles.addButtonDisabled,
-              ]}
-            >
-              {adding ? (
-                <ActivityIndicator size="small" color={colors.cream} />
-              ) : (
-                <Text style={styles.addButtonText}>Add</Text>
+            <View style={styles.formButtons}>
+              {/* Cancel, like the web edit form's: plain brown text */}
+              {editing && (
+                <Pressable
+                  onPress={cancelEditing}
+                  disabled={saving}
+                  accessibilityRole="button"
+                  style={styles.cancelButton}
+                  hitSlop={8}
+                >
+                  {({ pressed }) => (
+                    <Text style={[styles.cancelText, pressed && styles.cancelTextPressed]}>
+                      Cancel
+                    </Text>
+                  )}
+                </Pressable>
               )}
-            </Pressable>
+              <Pressable
+                onPress={handleSubmit}
+                disabled={saving}
+                accessibilityRole="button"
+                accessibilityState={{ busy: saving, disabled: saving }}
+                style={({ pressed }) => [
+                  styles.addButton,
+                  pressed && styles.addButtonPressed,
+                  saving && styles.addButtonDisabled,
+                ]}
+              >
+                {saving ? (
+                  <ActivityIndicator size="small" color={colors.cream} />
+                ) : (
+                  <Text style={styles.addButtonText}>{editing ? 'Save' : 'Add'}</Text>
+                )}
+              </Pressable>
+            </View>
           </View>
 
           {loadError && <Text style={styles.loadError}>{loadError}</Text>}
@@ -358,6 +446,7 @@ export default function HomeScreen() {
                     styles.reminder,
                     r.completed && styles.reminderDone,
                     pressed && styles.reminderPressed,
+                    editing?._id === r._id && styles.reminderEditing,
                   ]}
                 >
                   {/* Checkbox: empty outline, or filled with a checkmark */}
@@ -383,19 +472,32 @@ export default function HomeScreen() {
                     )}
                   </View>
 
-                  {/* Delete, like the web's "Del". Its own Pressable, so tapping it
-                      doesn't also check off the row. */}
-                  <Pressable
-                    onPress={() => confirmDelete(r)}
-                    hitSlop={8}
-                    accessibilityRole="button"
-                    accessibilityLabel={`Delete reminder: ${r.title}`}
-                    style={({ pressed }) => [styles.deleteButton, pressed && styles.deleteButtonPressed]}
-                  >
-                    {({ pressed }) => (
-                      <Text style={[styles.deleteText, pressed && styles.deleteTextPressed]}>Del</Text>
-                    )}
-                  </Pressable>
+                  {/* Edit and Del, like the web's. Each is its own Pressable, so
+                      tapping one doesn't also check off the row. */}
+                  <View style={styles.rowActions}>
+                    <Pressable
+                      onPress={() => startEditing(r)}
+                      hitSlop={4}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Edit reminder: ${r.title}`}
+                      style={({ pressed }) => [styles.rowAction, pressed && styles.editButtonPressed]}
+                    >
+                      {({ pressed }) => (
+                        <Text style={[styles.editText, pressed && styles.editTextPressed]}>Edit</Text>
+                      )}
+                    </Pressable>
+                    <Pressable
+                      onPress={() => confirmDelete(r)}
+                      hitSlop={4}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Delete reminder: ${r.title}`}
+                      style={({ pressed }) => [styles.rowAction, pressed && styles.deleteButtonPressed]}
+                    >
+                      {({ pressed }) => (
+                        <Text style={[styles.deleteText, pressed && styles.deleteTextPressed]}>Del</Text>
+                      )}
+                    </Pressable>
+                  </View>
                 </Pressable>
               );
             })}
@@ -620,8 +722,37 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.error,
   },
+  // "Editing reminder" above the title box while editing
+  editingLabel: {
+    fontFamily: fonts.bodyBold,
+    fontSize: 12,
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
+    color: colors.green,
+  },
+  // Cancel + Add/Save, on the right
+  formButtons: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    gap: 8,
+  },
+  // Cancel (web: px-3 py-1.5 text-xs font-bold uppercase text-[#6C5B4F] hover:text-[#2C211B])
+  cancelButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  cancelText: {
+    fontFamily: fonts.bodyBold,
+    fontSize: 12,
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
+    color: colors.brown,
+  },
+  cancelTextPressed: {
+    color: colors.brownDark,
+  },
   addButton: {
-    alignSelf: 'flex-end',
     backgroundColor: colors.green,
     borderRadius: 999,
     paddingHorizontal: 20,
@@ -682,6 +813,10 @@ const styles = StyleSheet.create({
   reminderPressed: {
     borderColor: colors.tan,
   },
+  // The row being edited gets the web edit form's green border
+  reminderEditing: {
+    borderColor: colors.green,
+  },
   checkbox: {
     width: 20,
     height: 20,
@@ -726,13 +861,33 @@ const styles = StyleSheet.create({
     color: colors.tanDark,
   },
 
-  // "Del" (web: text-[11px] font-bold uppercase tracking-wider text-[#A85368]
-  // px-2 py-1 rounded-lg hover:bg-[#A85368]/10 hover:text-[#632736])
-  deleteButton: {
+  // "Edit" and "Del" on each row (web: flex gap-1.5; each px-2 py-1 rounded-lg
+  // text-[11px] font-bold uppercase tracking-wider)
+  rowActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  rowAction: {
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 8,
   },
+  // Edit: text-[#6C5B4F] hover:text-[#2C211B] hover:bg-[#ECE1D2]
+  editButtonPressed: {
+    backgroundColor: colors.sand,
+  },
+  editText: {
+    fontFamily: fonts.bodyBold,
+    fontSize: 11,
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
+    color: colors.brown,
+  },
+  editTextPressed: {
+    color: colors.brownDark,
+  },
+  // Del: text-[#A85368] hover:text-[#632736] hover:bg-[#A85368]/10
   deleteButtonPressed: {
     backgroundColor: colors.pinkSoft,
   },

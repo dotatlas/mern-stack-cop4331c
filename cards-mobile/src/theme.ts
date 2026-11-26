@@ -16,6 +16,7 @@ export const colors = {
   doneBg: 'rgba(236, 225, 210, 0.5)', // bg-[#ECE1D2]/50  (checked-off reminder)
   doneBorder: 'rgba(207, 190, 170, 0.6)', // border-[#CFBEAA]/60
   doneText: '#9C8A7C', // text-[#9C8A7C]  (struck-through title)
+  sand: '#ECE1D2', // hover:bg-[#ECE1D2]  (pressed "Edit")
   green: '#355E48', // accent for pending reminders
   greenDark: '#1E3E2D', // text on green badges
   greenSoft: 'rgba(53, 94, 72, 0.15)', // bg-[#355E48]/15
