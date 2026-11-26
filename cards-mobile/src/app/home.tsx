@@ -29,8 +29,8 @@ export default function HomeScreen() {
   const { user, logout } = useAuth();
   const [checking, setChecking] = useState(false);
 
-  // The list on screen, loaded from the server. Adding saves to the server;
-  // checking off still only changes this copy in memory (not saved yet).
+  // The list on screen, loaded from the server. Adding and checking off
+  // both save to the server.
   const [reminders, setReminders] = useState<Reminder[]>([]);
   const doneCount = reminders.filter((r) => r.completed).length;
   const [loading, setLoading] = useState(true); // first load: big spinner
@@ -106,11 +106,40 @@ export default function HomeScreen() {
     }
   }
 
-  // Flip one reminder between done and not done
-  function toggleReminder(id: string) {
-    setReminders((previous) =>
-      previous.map((r) => (r._id === id ? { ...r, completed: !r.completed } : r)),
-    );
+  // Reminders whose check-off request is still on its way. A ref (not state)
+  // so a fast second tap sees it right away, before the screen redraws.
+  const pendingToggles = useRef(new Set<string>());
+  const [toggleError, setToggleError] = useState<string | null>(null);
+
+  // Set one reminder's completed value on just that one item, keeping the list order
+  function setCompleted(id: string, completed: boolean) {
+    setReminders((previous) => previous.map((x) => (x._id === id ? { ...x, completed } : x)));
+  }
+
+  // Flip one reminder between done and not done, and save it on the server.
+  // The checkmark changes right away; if the save fails it goes back.
+  async function toggleReminder(r: Reminder) {
+    if (pendingToggles.current.has(r._id)) return; // already saving this one
+    pendingToggles.current.add(r._id);
+
+    // The server sets the value we send (it doesn't flip it), so send the new value
+    const wanted = !r.completed;
+    setToggleError(null);
+    setCompleted(r._id, wanted);
+    try {
+      const saved = await apiRequest<Reminder>(
+        `${REMINDERS_PATH}/${r._id}/complete`,
+        'PATCH',
+        { completed: wanted },
+      );
+      // Swap in the server's copy, in the same spot
+      setReminders((previous) => previous.map((x) => (x._id === saved._id ? saved : x)));
+    } catch (e) {
+      setCompleted(r._id, r.completed); // put the checkmark back
+      setToggleError(e instanceof Error ? e.message : String(e));
+    } finally {
+      pendingToggles.current.delete(r._id);
+    }
   }
 
   // Asks the server for my account. Only works if the token is sent along.
@@ -269,6 +298,7 @@ export default function HomeScreen() {
           </View>
 
           {loadError && <Text style={styles.loadError}>{loadError}</Text>}
+          {toggleError && <Text style={styles.loadError}>{toggleError}</Text>}
 
           {loading ? (
             <ActivityIndicator style={styles.listSpinner} size="large" color={colors.green} />
@@ -284,7 +314,7 @@ export default function HomeScreen() {
               return (
                 <Pressable
                   key={r._id}
-                  onPress={() => toggleReminder(r._id)}
+                  onPress={() => toggleReminder(r)}
                   accessibilityRole="checkbox"
                   accessibilityState={{ checked: r.completed }}
                   style={({ pressed }) => [
