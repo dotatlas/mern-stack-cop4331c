@@ -1,10 +1,9 @@
-// Shared colors and fonts, copied from the web frontend's Tailwind classes.
+// Shared colors and fonts, copied from the web frontend's Tailwind classes
+// (cards-frontend/src/LoginPage.tsx and Dashboard.tsx).
 
 export const colors = {
-  burgundy: '#8b3d4b', // bg-[#8b3d4b]  (buttons, focus, logo)
-  burgundyPressed: '#72323e', // hover:bg-[#72323e]
-  page: '#f7f5f0', // bg-[#f7f5f0]  (screen background)
-  cream: '#FAF5EE', // bg-[#FAF5EE]  (dashboard panels; the login card is white)
+  page: '#F4EDE4', // bg-[#F4EDE4]  (screen background, login and dashboard)
+  cream: '#FAF5EE', // bg-[#FAF5EE]  (cards and panels, login card included)
   white: '#ffffff',
   // Dashboard's warm browns (web Log Out button)
   brown: '#6C5B4F', // text-[#6C5B4F]
@@ -26,9 +25,10 @@ export const colors = {
   calHeader: '#F2E8DC', // bg-[#F2E8DC]  (month title bar)
   weekdayBg: '#EAE0D1', // bg-[#EAE0D1]  (Sun–Sat row)
   weekdayText: '#5C4A3E', // text-[#5C4A3E]
-  espresso: '#4E2E1E', // bg-[#4E2E1E]  (today's number, pressed Today button, Create Event)
-  espressoPressed: '#3D2214', // hover:bg-[#3D2214]  (pressed Create Event)
-  placeholder: '#AFA193', // placeholder-[#AFA193]  (event form)
+  // Main brand color: logo, main buttons, focused inputs, links, active tab, spinners
+  espresso: '#4E2E1E', // bg-[#4E2E1E]
+  espressoPressed: '#3D2214', // hover:bg-[#3D2214]
+  placeholder: '#AFA193', // placeholder-[#AFA193]  (all inputs)
   espressoRing: 'rgba(78, 46, 30, 0.4)', // ring-[#4E2E1E]/40  (today's cell)
   todayBg: '#FDF9F2', // bg-[#FDF9F2]  (today's cell)
   outsideBg: 'rgba(250, 245, 238, 0.6)', // bg-[#FAF5EE]/60  (days from next/previous month)
@@ -37,15 +37,14 @@ export const colors = {
   pinkSoft: 'rgba(168, 83, 104, 0.1)', // hover:bg-[#A85368]/10  (pressed "Del")
   pinkTint: 'rgba(168, 83, 104, 0.15)', // bg-[#A85368]/15  (web event Delete button)
   pinkBorder: 'rgba(168, 83, 104, 0.3)', // border-[#A85368]/30
-  error: '#b91c1c', // text-red-700  (error messages)
-  success: '#15803d', // text-green-700  (success messages)
-  // Tailwind's "stone" grays
-  stone50: '#fafaf9',
-  stone100: '#f5f5f4',
-  stone200: '#e7e5e4',
-  stone500: '#78716c',
-  stone800: '#292524',
-  stone900: '#1c1917',
+  // Messages (web login banners). The login, register and forgot password
+  // screens use all three as a banner; elsewhere errors are just the text color.
+  error: '#632736', // text-[#632736]
+  errorBg: 'rgba(168, 83, 104, 0.12)', // bg-[#A85368]/12
+  errorBorder: 'rgba(168, 83, 104, 0.3)', // border-[#A85368]/30
+  success: '#1E3E2D', // text-[#1E3E2D]
+  successBg: 'rgba(53, 94, 72, 0.12)', // bg-[#355E48]/12
+  successBorder: 'rgba(53, 94, 72, 0.3)', // border-[#355E48]/30
 };
 
 // Each weight is its own font file, so each gets its own name.
@@ -53,7 +52,6 @@ export const colors = {
 export const fonts = {
   heading: 'Lora_600SemiBold',
   headingBold: 'Lora_700Bold', // web font-serif font-black (Lora tops out at 700)
-  body: 'Inter_400Regular',
   bodyMedium: 'Inter_500Medium',
   bodySemiBold: 'Inter_600SemiBold',
   bodyBold: 'Inter_700Bold',

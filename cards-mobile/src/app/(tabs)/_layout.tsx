@@ -11,8 +11,8 @@ export default function TabsLayout() {
     <Tabs
       screenOptions={{
         headerShown: false, // each screen draws its own header
-        tabBarActiveTintColor: colors.burgundy,
-        tabBarInactiveTintColor: colors.brown,
+        tabBarActiveTintColor: colors.espresso,
+        tabBarInactiveTintColor: colors.doneText,
         tabBarStyle: {
           backgroundColor: colors.cream,
           borderTopColor: colors.panelBorder,

@@ -129,7 +129,7 @@ export default function LoginScreen() {
                 value={email}
                 onChangeText={setEmail}
                 placeholder="name@example.com"
-                placeholderTextColor={colors.stone500}
+                placeholderTextColor={colors.placeholder}
                 keyboardType="email-address"
                 autoCapitalize="none"
                 autoCorrect={false}
@@ -188,7 +188,7 @@ export default function LoginScreen() {
                   disabled={resending}
                 >
                   {resending ? (
-                    <ActivityIndicator color={colors.burgundy} />
+                    <ActivityIndicator color={colors.espresso} />
                   ) : (
                     <Text style={styles.resendButtonText}>Resend verification email</Text>
                   )}
@@ -208,7 +208,7 @@ export default function LoginScreen() {
               disabled={loading}
             >
               {loading ? (
-                <ActivityIndicator color={colors.white} />
+                <ActivityIndicator color={colors.cream} />
               ) : (
                 <Text style={styles.buttonText}>Log In</Text>
               )}
@@ -256,38 +256,38 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 8,
-    backgroundColor: colors.burgundy,
+    backgroundColor: colors.espresso,
     alignItems: 'center',
     justifyContent: 'center',
     boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)',
   },
   logoText: {
-    color: colors.white,
-    fontFamily: fonts.bodyBold,
+    color: colors.cream,
+    fontFamily: fonts.headingBold,
     fontSize: 18,
   },
   brandTitle: {
-    fontFamily: fonts.heading,
+    fontFamily: fonts.headingBold,
     fontSize: 30,
     letterSpacing: -0.75,
-    color: colors.stone900,
+    color: colors.brownDark,
   },
 
   // Card
   card: {
     width: '100%',
     maxWidth: 420,
-    backgroundColor: colors.white,
+    backgroundColor: colors.cream,
     padding: 32,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: colors.stone100,
+    borderColor: colors.calBorder,
     boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)',
   },
   cardTitle: {
-    fontFamily: fonts.heading,
+    fontFamily: fonts.headingBold,
     fontSize: 20,
-    color: colors.stone800,
+    color: colors.brownDark,
     textAlign: 'center',
     marginBottom: 24,
   },
@@ -297,26 +297,26 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   label: {
-    fontFamily: fonts.bodySemiBold,
+    fontFamily: fonts.bodyBold,
     fontSize: 12,
-    color: colors.stone500,
+    color: colors.brown,
     textTransform: 'uppercase',
     letterSpacing: 0.6,
     marginBottom: 6,
   },
   input: {
-    fontFamily: fonts.body,
+    fontFamily: fonts.bodySemiBold,
     fontSize: 16, // 16+ stops iOS from feeling cramped; web uses 14
-    color: colors.stone800,
-    backgroundColor: colors.stone50,
+    color: colors.brownDark,
+    backgroundColor: colors.white,
     borderWidth: 1,
-    borderColor: colors.stone200,
+    borderColor: colors.tan,
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 10,
   },
   inputFocused: {
-    borderColor: colors.burgundy,
+    borderColor: colors.espresso,
   },
   // "Forgot password?" under the password box, on the right
   forgot: {
@@ -324,14 +324,14 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   forgotText: {
-    fontFamily: fonts.bodyMedium,
-    fontSize: 13,
-    color: colors.stone500,
+    fontFamily: fonts.bodyBold,
+    fontSize: 12,
+    color: colors.espresso,
   },
 
   // Button
   button: {
-    backgroundColor: colors.burgundy,
+    backgroundColor: colors.espresso,
     borderRadius: 8,
     paddingVertical: 12,
     alignItems: 'center',
@@ -339,7 +339,7 @@ const styles = StyleSheet.create({
     boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)',
   },
   buttonPressed: {
-    backgroundColor: colors.burgundyPressed,
+    backgroundColor: colors.espressoPressed,
   },
   buttonDisabled: {
     opacity: 0.7,
@@ -347,9 +347,15 @@ const styles = StyleSheet.create({
 
   // Error message under the inputs
   error: {
-    fontFamily: fonts.bodyMedium,
+    fontFamily: fonts.bodySemiBold,
     fontSize: 14,
     color: colors.error,
+    backgroundColor: colors.errorBg,
+    borderWidth: 2,
+    borderColor: colors.errorBorder,
+    borderRadius: 16,
+    padding: 12,
+    overflow: 'hidden',
     textAlign: 'center',
     marginBottom: 8,
   },
@@ -359,32 +365,40 @@ const styles = StyleSheet.create({
   },
   resendButton: {
     borderWidth: 1,
-    borderColor: colors.burgundy,
+    borderColor: colors.espresso,
     borderRadius: 8,
     paddingVertical: 10,
     alignItems: 'center',
     marginBottom: 8,
   },
   resendButtonPressed: {
-    backgroundColor: colors.stone50,
+    backgroundColor: colors.sand,
   },
   resendButtonText: {
-    color: colors.burgundy,
+    color: colors.espresso,
     fontFamily: fonts.bodyMedium,
     fontSize: 14,
   },
   // Green message after the email is resent
   success: {
-    fontFamily: fonts.bodyMedium,
+    fontFamily: fonts.bodySemiBold,
     fontSize: 14,
     color: colors.success,
+    backgroundColor: colors.successBg,
+    borderWidth: 2,
+    borderColor: colors.successBorder,
+    borderRadius: 16,
+    padding: 12,
+    overflow: 'hidden',
     textAlign: 'center',
     marginBottom: 8,
   },
   buttonText: {
-    color: colors.white,
-    fontFamily: fonts.bodyMedium,
-    fontSize: 16,
+    color: colors.cream,
+    fontFamily: fonts.bodyBold,
+    fontSize: 14,
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
   },
 
   // Footer link
@@ -392,15 +406,17 @@ const styles = StyleSheet.create({
     marginTop: 24,
     paddingTop: 24,
     borderTopWidth: 1,
-    borderTopColor: colors.stone100,
+    borderTopColor: colors.panelBorder,
     alignItems: 'center',
   },
   link: {
-    fontFamily: fonts.bodyMedium,
-    fontSize: 14,
-    color: colors.stone500,
+    fontFamily: fonts.bodyBold,
+    fontSize: 12,
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
+    color: colors.brown,
   },
   linkPressed: {
-    color: colors.stone800,
+    color: colors.brownDark,
   },
 });

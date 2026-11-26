@@ -13,7 +13,7 @@ export default function Index() {
   if (loading) {
     return (
       <View style={styles.loading}>
-        <ActivityIndicator size="large" color={colors.burgundy} />
+        <ActivityIndicator size="large" color={colors.espresso} />
       </View>
     );
   }

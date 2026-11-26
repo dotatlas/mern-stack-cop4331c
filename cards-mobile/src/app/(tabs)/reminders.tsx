@@ -266,8 +266,8 @@ export default function RemindersScreen() {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={handleRefresh}
-            tintColor={colors.burgundy} // iOS spinner color
-            colors={[colors.burgundy]} // Android spinner color
+            tintColor={colors.espresso} // iOS spinner color
+            colors={[colors.espresso]} // Android spinner color
           />
         }
       >
@@ -534,38 +534,38 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 8,
-    backgroundColor: colors.burgundy,
+    backgroundColor: colors.espresso,
     alignItems: 'center',
     justifyContent: 'center',
     boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)',
   },
   logoText: {
-    color: colors.white,
-    fontFamily: fonts.bodyBold,
+    color: colors.cream,
+    fontFamily: fonts.headingBold,
     fontSize: 18,
   },
   brandTitle: {
-    fontFamily: fonts.heading,
+    fontFamily: fonts.headingBold,
     fontSize: 30,
     letterSpacing: -0.75,
-    color: colors.stone900,
+    color: colors.brownDark,
   },
 
   // Card
   card: {
     width: '100%',
     maxWidth: 420,
-    backgroundColor: colors.white,
+    backgroundColor: colors.cream,
     padding: 32,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: colors.stone100,
+    borderColor: colors.panelBorder,
     boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)',
   },
   cardTitle: {
-    fontFamily: fonts.heading,
+    fontFamily: fonts.headingBold,
     fontSize: 20,
-    color: colors.stone800,
+    color: colors.espresso,
     textAlign: 'center',
   },
 
