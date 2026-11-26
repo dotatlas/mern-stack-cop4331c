@@ -18,7 +18,7 @@ import { useAuth, type User } from '@/auth';
 import {
   DUE_CHOICES,
   formatDueAt,
-  makeReminder,
+  makeNewReminder,
   REMINDERS_PATH,
   type DueChoice,
   type Reminder,
@@ -29,8 +29,8 @@ export default function HomeScreen() {
   const { user, logout } = useAuth();
   const [checking, setChecking] = useState(false);
 
-  // The list on screen, loaded from the server. Adding and checking off
-  // still only change this copy in memory (nothing is saved yet).
+  // The list on screen, loaded from the server. Adding saves to the server;
+  // checking off still only changes this copy in memory (not saved yet).
   const [reminders, setReminders] = useState<Reminder[]>([]);
   const doneCount = reminders.filter((r) => r.completed).length;
   const [loading, setLoading] = useState(true); // first load: big spinner
@@ -74,18 +74,36 @@ export default function HomeScreen() {
   const [newDue, setNewDue] = useState<DueChoice>('No date');
   const [addError, setAddError] = useState<string | null>(null);
   const [titleFocused, setTitleFocused] = useState(false);
+  const [adding, setAdding] = useState(false); // spinner on the Add button
 
-  function handleAddReminder() {
+  // Save the new reminder on the server, then show the copy it sends back
+  async function handleAddReminder() {
+    if (adding) return; // ignore extra taps / Enter presses while waiting
+
     const title = newTitle.trim();
     if (!title) {
       setAddError('Please enter a title');
       return;
     }
-    // New ones go on top, like the web dashboard
-    setReminders((previous) => [makeReminder(title, newDue), ...previous]);
-    setNewTitle('');
-    setNewDue('No date');
+
     setAddError(null);
+    setAdding(true);
+    try {
+      const saved = await apiRequest<Reminder>(
+        REMINDERS_PATH,
+        'POST',
+        makeNewReminder(title, newDue),
+      );
+      // New ones go on top, like the web dashboard. The server's copy has the real _id.
+      setReminders((previous) => [saved, ...previous]);
+      setNewTitle('');
+      setNewDue('No date');
+    } catch (e) {
+      // Leave the title and due date as typed so the user can just tap Add again
+      setAddError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setAdding(false);
+    }
   }
 
   // Flip one reminder between done and not done
@@ -233,10 +251,20 @@ export default function HomeScreen() {
 
             <Pressable
               onPress={handleAddReminder}
+              disabled={adding}
               accessibilityRole="button"
-              style={({ pressed }) => [styles.addButton, pressed && styles.addButtonPressed]}
+              accessibilityState={{ busy: adding, disabled: adding }}
+              style={({ pressed }) => [
+                styles.addButton,
+                pressed && styles.addButtonPressed,
+                adding && styles.addButtonDisabled,
+              ]}
             >
-              <Text style={styles.addButtonText}>Add</Text>
+              {adding ? (
+                <ActivityIndicator size="small" color={colors.cream} />
+              ) : (
+                <Text style={styles.addButtonText}>Add</Text>
+              )}
             </Pressable>
           </View>
 
@@ -520,6 +548,9 @@ const styles = StyleSheet.create({
   },
   addButtonPressed: {
     backgroundColor: '#284936', // web hover:bg-[#284936]
+  },
+  addButtonDisabled: {
+    opacity: 0.7,
   },
   addButtonText: {
     fontFamily: fonts.bodyBold,

@@ -34,17 +34,23 @@ export const DUE_CHOICES = [
 
 export type DueChoice = (typeof DUE_CHOICES)[number]['label'];
 
-// Builds a new, not-yet-done reminder from the form.
+// What the Add reminder form sends to POST /api/reminders.
+// title is the only required field. dueAt is an ISO date string, or null for
+// no due date. The server fills in the rest (priority "medium", not completed)
+// and replies 201 with the saved reminder, including its real _id.
+export type NewReminder = {
+  title: string;
+  dueAt: string | null;
+};
+
+// Builds the request body from the form.
 // The due time is noon, which the web treats as "no time picked", so only
-// the date shows. The _id is temporary; the server will make real ones later.
-export function makeReminder(title: string, choice: DueChoice): Reminder {
+// the date shows.
+export function makeNewReminder(title: string, choice: DueChoice): NewReminder {
   const days = DUE_CHOICES.find((c) => c.label === choice)?.days ?? null;
   return {
-    _id: `local-${Date.now()}`,
     title,
     dueAt: days === null ? null : dueIn(days, 12),
-    priority: 'medium', // the backend's default
-    completed: false,
   };
 }
 
