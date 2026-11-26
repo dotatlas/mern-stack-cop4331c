@@ -35,6 +35,8 @@ export const colors = {
   pink: '#A85368', // accent for completed reminders; also the "Del" button text
   pinkDark: '#632736', // hover:text-[#632736]  (pressed "Del")
   pinkSoft: 'rgba(168, 83, 104, 0.1)', // hover:bg-[#A85368]/10  (pressed "Del")
+  pinkTint: 'rgba(168, 83, 104, 0.15)', // bg-[#A85368]/15  (web event Delete button)
+  pinkBorder: 'rgba(168, 83, 104, 0.3)', // border-[#A85368]/30
   error: '#b91c1c', // text-red-700  (error messages)
   success: '#15803d', // text-green-700  (success messages)
   // Tailwind's "stone" grays

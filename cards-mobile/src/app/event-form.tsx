@@ -2,6 +2,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -66,6 +67,8 @@ export default function EventFormScreen() {
 
   const [focused, setFocused] = useState<Field | null>(null);
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false); // spinner on Delete event
+  const busy = saving || deleting;
   const [error, setError] = useState<string | null>(null);
 
   const endRef = useRef<React.ComponentRef<typeof TextInput>>(null);
@@ -155,7 +158,7 @@ export default function EventFormScreen() {
   }
 
   async function handleSave() {
-    if (saving || loading) return; // ignore extra taps while waiting
+    if (busy || loading) return; // ignore extra taps while waiting
 
     if (!title.trim()) {
       setError('Please enter a title');
@@ -213,6 +216,35 @@ export default function EventFormScreen() {
     }
   }
 
+  // "Delete event": ask first, like the web's "Delete this event?"
+  function confirmDelete() {
+    if (!original || busy) return;
+    // Alert buttons do nothing in a browser, so use the browser's own popup there
+    if (Platform.OS === 'web') {
+      if (window.confirm('Delete this event?')) handleDelete();
+      return;
+    }
+    Alert.alert('Delete this event?', original.title, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete', style: 'destructive', onPress: handleDelete },
+    ]);
+  }
+
+  async function handleDelete() {
+    if (!original || busy) return;
+    setError(null);
+    setDeleting(true);
+    try {
+      // Replies 200 { message }; 404 if it's already gone
+      await apiRequest(`${EVENTS_PATH}/${original._id}`, 'DELETE');
+      // The Calendar tab reloads as it comes back into view, so it's gone there too
+      goBack();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+      setDeleting(false);
+    }
+  }
+
   function goBack() {
     if (router.canGoBack()) router.back();
     else router.replace('/calendar');
@@ -226,7 +258,7 @@ export default function EventFormScreen() {
       >
         {/* Top bar: Cancel on the left */}
         <View style={styles.topBar}>
-          <Pressable onPress={goBack} disabled={saving} hitSlop={8} accessibilityRole="button">
+          <Pressable onPress={goBack} disabled={busy} hitSlop={8} accessibilityRole="button">
             {({ pressed }) => (
               <Text style={[styles.cancelText, pressed && styles.cancelTextPressed]}>Cancel</Text>
             )}
@@ -401,13 +433,13 @@ export default function EventFormScreen() {
                 {/* Web: "Create Event" / "Save Changes", dark espresso button */}
                 <Pressable
                   onPress={handleSave}
-                  disabled={saving}
+                  disabled={busy}
                   accessibilityRole="button"
-                  accessibilityState={{ busy: saving, disabled: saving }}
+                  accessibilityState={{ busy: saving, disabled: busy }}
                   style={({ pressed }) => [
                     styles.saveButton,
                     pressed && styles.saveButtonPressed,
-                    saving && styles.saveButtonDisabled,
+                    busy && styles.saveButtonDisabled,
                   ]}
                 >
                   {saving ? (
@@ -416,6 +448,31 @@ export default function EventFormScreen() {
                     <Text style={styles.saveText}>{isEdit ? 'Save Changes' : 'Create Event'}</Text>
                   )}
                 </Pressable>
+
+                {/* Edit only. Web: pink-tinted pill, solid pink with white text on hover. */}
+                {isEdit && (
+                  <Pressable
+                    onPress={confirmDelete}
+                    disabled={busy}
+                    accessibilityRole="button"
+                    accessibilityState={{ busy: deleting, disabled: busy }}
+                    style={({ pressed }) => [
+                      styles.deleteButton,
+                      pressed && styles.deleteButtonPressed,
+                      busy && styles.saveButtonDisabled,
+                    ]}
+                  >
+                    {({ pressed }) =>
+                      deleting ? (
+                        <ActivityIndicator color={colors.pinkDark} />
+                      ) : (
+                        <Text style={[styles.deleteText, pressed && styles.deleteTextPressed]}>
+                          Delete event
+                        </Text>
+                      )
+                    }
+                  </Pressable>
+                )}
               </>
             )}
           </View>
@@ -612,5 +669,30 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 0.6,
     color: colors.cream,
+  },
+
+  // Web: bg-[#A85368]/15 border-2 border-[#A85368]/30 text-[#632736] rounded-full
+  // uppercase; hover:bg-[#A85368] hover:text-white
+  deleteButton: {
+    marginTop: 12,
+    backgroundColor: colors.pinkTint,
+    borderWidth: 2,
+    borderColor: colors.pinkBorder,
+    borderRadius: 999,
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  deleteButtonPressed: {
+    backgroundColor: colors.pink,
+  },
+  deleteText: {
+    fontFamily: fonts.bodyBold,
+    fontSize: 12,
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
+    color: colors.pinkDark,
+  },
+  deleteTextPressed: {
+    color: colors.white,
   },
 });
