@@ -15,7 +15,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { apiRequest } from '@/api';
-import { useAuth, type User } from '@/auth';
+import { useAuth } from '@/auth';
 import {
   DUE_CHOICES,
   dueAtForChoice,
@@ -32,7 +32,6 @@ import { colors, fonts } from '@/theme';
 // The Reminders tab (this was the Home screen before tabs were added)
 export default function RemindersScreen() {
   const { user, logout } = useAuth();
-  const [checking, setChecking] = useState(false);
 
   // The list on screen, loaded from the server. Adding, editing, checking off
   // and deleting all save to the server.
@@ -234,20 +233,6 @@ export default function RemindersScreen() {
     }
   }
 
-  // Asks the server for my account. Only works if the token is sent along.
-  async function handleCheckAccount() {
-    if (!user || checking) return;
-    setChecking(true);
-    try {
-      const account = await apiRequest<User>(`/users/${user._id}`);
-      Alert.alert('Your account', `${account.firstName} ${account.lastName}\n${account.email}`);
-    } catch (e) {
-      Alert.alert('Could not check account', e instanceof Error ? e.message : String(e));
-    } finally {
-      setChecking(false);
-    }
-  }
-
   async function handleLogout() {
     await logout(); // deletes the saved token and user
     // replace (not push) swaps the whole tabs group out for Login, so Back can't return here
@@ -298,23 +283,6 @@ export default function RemindersScreen() {
           <Text style={styles.cardTitle}>
             Welcome, {user?.firstName} {user?.lastName}
           </Text>
-
-          <Pressable
-            onPress={handleCheckAccount}
-            disabled={checking}
-            style={({ pressed }) => [
-              styles.checkButton,
-              pressed && styles.checkButtonPressed,
-              checking && styles.checkButtonDisabled,
-            ]}
-            accessibilityRole="button"
-          >
-            {checking ? (
-              <ActivityIndicator color={colors.burgundy} />
-            ) : (
-              <Text style={styles.checkButtonText}>Check my account</Text>
-            )}
-          </Pressable>
         </View>
 
         {/* Reminders panel, styled like the web dashboard's */}
@@ -599,27 +567,6 @@ const styles = StyleSheet.create({
     fontSize: 20,
     color: colors.stone800,
     textAlign: 'center',
-  },
-
-  // "Check my account": outlined version of the burgundy button
-  checkButton: {
-    marginTop: 24,
-    borderWidth: 1,
-    borderColor: colors.burgundy,
-    borderRadius: 8,
-    paddingVertical: 10,
-    alignItems: 'center',
-  },
-  checkButtonPressed: {
-    backgroundColor: colors.stone50,
-  },
-  checkButtonDisabled: {
-    opacity: 0.7,
-  },
-  checkButtonText: {
-    fontFamily: fonts.bodyMedium,
-    fontSize: 14,
-    color: colors.burgundy,
   },
 
   // Reminders panel (web: bg-[#FAF5EE] rounded-3xl border-2 border-[#DFD3C3] p-7)
