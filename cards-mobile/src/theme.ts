@@ -21,6 +21,15 @@ export const colors = {
   greenDark: '#1E3E2D', // text on green badges
   greenSoft: 'rgba(53, 94, 72, 0.15)', // bg-[#355E48]/15
   greenBorder: 'rgba(53, 94, 72, 0.3)', // border-[#355E48]/30
+  // Dashboard calendar
+  calBorder: '#D5C6B3', // border-[#D5C6B3]  (panel border, lines between days)
+  calHeader: '#F2E8DC', // bg-[#F2E8DC]  (month title bar)
+  weekdayBg: '#EAE0D1', // bg-[#EAE0D1]  (Sun–Sat row)
+  weekdayText: '#5C4A3E', // text-[#5C4A3E]
+  espresso: '#4E2E1E', // bg-[#4E2E1E]  (today's number, pressed Today button)
+  espressoRing: 'rgba(78, 46, 30, 0.4)', // ring-[#4E2E1E]/40  (today's cell)
+  todayBg: '#FDF9F2', // bg-[#FDF9F2]  (today's cell)
+  outsideBg: 'rgba(250, 245, 238, 0.6)', // bg-[#FAF5EE]/60  (days from next/previous month)
   pink: '#A85368', // accent for completed reminders; also the "Del" button text
   pinkDark: '#632736', // hover:text-[#632736]  (pressed "Del")
   pinkSoft: 'rgba(168, 83, 104, 0.1)', // hover:bg-[#A85368]/10  (pressed "Del")
@@ -39,6 +48,7 @@ export const colors = {
 // These names must match the keys loaded with useFonts in src/app/_layout.tsx.
 export const fonts = {
   heading: 'Lora_600SemiBold',
+  headingBold: 'Lora_700Bold', // web font-serif font-black (Lora tops out at 700)
   body: 'Inter_400Regular',
   bodyMedium: 'Inter_500Medium',
   bodySemiBold: 'Inter_600SemiBold',
