@@ -390,9 +390,7 @@ const styles = StyleSheet.create({
   buttonText: {
     color: colors.cream,
     fontFamily: fonts.bodyBold,
-    fontSize: 14,
-    textTransform: 'uppercase',
-    letterSpacing: 0.6,
+    fontSize: 16,
   },
 
   // Footer link
@@ -405,9 +403,7 @@ const styles = StyleSheet.create({
   },
   link: {
     fontFamily: fonts.bodyBold,
-    fontSize: 12,
-    textTransform: 'uppercase',
-    letterSpacing: 0.6,
+    fontSize: 14,
     color: colors.brown,
   },
   linkPressed: {
