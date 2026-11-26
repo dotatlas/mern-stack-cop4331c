@@ -10,58 +10,17 @@ export type Reminder = {
   completed: boolean;
 };
 
+// Where the Home screen loads the list from. Needs the login token.
+// GET /api/reminders replies 200 with a plain array (not wrapped in an
+// object), only this user's reminders, sorted by dueAt (no-date ones first).
+export const REMINDERS_PATH = '/reminders';
+
 // An ISO date `daysFromToday` days from now at hour:minute (local time).
-// Keeps the sample dates near today instead of going stale.
 function dueIn(daysFromToday: number, hour: number, minute = 0): string {
   const d = new Date();
   d.setDate(d.getDate() + daysFromToday);
   d.setHours(hour, minute, 0, 0);
   return d.toISOString();
-}
-
-// Local sample data until the live server has /reminders.
-// Later this gets replaced by: await apiRequest<Reminder[]>('/reminders')
-export function getSampleReminders(): Reminder[] {
-  return [
-    {
-      _id: 'sample-1',
-      title: 'Submit COP4331 project milestone',
-      notes: 'Upload the mobile build and the API docs',
-      dueAt: dueIn(1, 23, 59),
-      priority: 'high',
-      completed: false,
-    },
-    {
-      _id: 'sample-2',
-      title: 'Team meeting prep',
-      notes: 'Bring the register screen demo',
-      dueAt: dueIn(0, 15, 30),
-      priority: 'medium',
-      completed: true,
-    },
-    {
-      _id: 'sample-3',
-      title: 'Pick up groceries',
-      dueAt: dueIn(2, 12), // noon = "no time picked", so only the date shows
-      priority: 'low',
-      completed: false,
-    },
-    {
-      _id: 'sample-4',
-      title: 'Renew library books',
-      dueAt: dueIn(4, 10),
-      priority: 'medium',
-      completed: false,
-    },
-    {
-      _id: 'sample-5',
-      title: 'Call the dentist',
-      notes: 'Reschedule the cleaning',
-      dueAt: null,
-      priority: 'low',
-      completed: true,
-    },
-  ];
 }
 
 // Quick due-date choices for the Add reminder form.

@@ -1,9 +1,10 @@
 import { router } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -17,8 +18,8 @@ import { useAuth, type User } from '@/auth';
 import {
   DUE_CHOICES,
   formatDueAt,
-  getSampleReminders,
   makeReminder,
+  REMINDERS_PATH,
   type DueChoice,
   type Reminder,
 } from '@/reminders';
@@ -28,10 +29,45 @@ export default function HomeScreen() {
   const { user, logout } = useAuth();
   const [checking, setChecking] = useState(false);
 
-  // The list on screen. Starts with sample data; checking one off only
-  // changes this copy in memory (nothing is saved yet).
-  const [reminders, setReminders] = useState<Reminder[]>(getSampleReminders);
+  // The list on screen, loaded from the server. Adding and checking off
+  // still only change this copy in memory (nothing is saved yet).
+  const [reminders, setReminders] = useState<Reminder[]>([]);
   const doneCount = reminders.filter((r) => r.completed).length;
+  const [loading, setLoading] = useState(true); // first load: big spinner
+  const [refreshing, setRefreshing] = useState(false); // pull-to-refresh spinner
+  const [loadError, setLoadError] = useState<string | null>(null);
+  // Counts loads so only the newest answer is used if two overlap
+  const loadId = useRef(0);
+
+  // Ask the server for my reminders. apiRequest sends the login token, and
+  // logs out by itself if the server says the token is no longer valid.
+  async function loadReminders() {
+    const id = ++loadId.current;
+    setLoadError(null);
+    try {
+      const data = await apiRequest<Reminder[]>(REMINDERS_PATH);
+      if (id === loadId.current) setReminders(data);
+    } catch (e) {
+      // Keep whatever list was already showing and explain what went wrong
+      if (id === loadId.current) setLoadError(e instanceof Error ? e.message : String(e));
+    } finally {
+      if (id === loadId.current) {
+        setLoading(false);
+        setRefreshing(false);
+      }
+    }
+  }
+
+  // Load once when Home opens
+  useEffect(() => {
+    loadReminders();
+  }, []);
+
+  // Pull down on the screen to reload
+  function handleRefresh() {
+    setRefreshing(true);
+    loadReminders();
+  }
 
   // The Add reminder form
   const [newTitle, setNewTitle] = useState('');
@@ -100,6 +136,14 @@ export default function HomeScreen() {
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
         automaticallyAdjustKeyboardInsets
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            tintColor={colors.burgundy} // iOS spinner color
+            colors={[colors.burgundy]} // Android spinner color
+          />
+        }
       >
         {/* Brand header (same as the login screen) */}
         <View style={styles.brand}>
@@ -139,11 +183,13 @@ export default function HomeScreen() {
               <Text style={styles.panelTitle}>Reminders</Text>
               <View style={styles.titleDot} />
             </View>
-            <View style={styles.countBadge}>
-              <Text style={styles.countText}>
-                {doneCount} of {reminders.length} done
-              </Text>
-            </View>
+            {!loading && (
+              <View style={styles.countBadge}>
+                <Text style={styles.countText}>
+                  {doneCount} of {reminders.length} done
+                </Text>
+              </View>
+            )}
           </View>
 
           {/* Add reminder form */}
@@ -193,6 +239,14 @@ export default function HomeScreen() {
               <Text style={styles.addButtonText}>Add</Text>
             </Pressable>
           </View>
+
+          {loadError && <Text style={styles.loadError}>{loadError}</Text>}
+
+          {loading ? (
+            <ActivityIndicator style={styles.listSpinner} size="large" color={colors.green} />
+          ) : reminders.length === 0 && !loadError ? (
+            <Text style={styles.empty}>No reminders yet. Add one above!</Text>
+          ) : null}
 
           <View style={styles.list}>
             {reminders.map((r) => {
@@ -473,6 +527,25 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 0.6,
     color: colors.cream,
+  },
+
+  // Loading / empty / error states above the list
+  listSpinner: {
+    marginVertical: 24,
+  },
+  empty: {
+    fontFamily: fonts.bodySemiBold,
+    fontSize: 14,
+    color: colors.tanDark,
+    textAlign: 'center',
+    marginVertical: 24,
+  },
+  loadError: {
+    fontFamily: fonts.bodyMedium,
+    fontSize: 14,
+    color: colors.error,
+    textAlign: 'center',
+    marginBottom: 12,
   },
 
   // One reminder row
