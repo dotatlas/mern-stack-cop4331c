@@ -72,8 +72,8 @@ export default function LoginScreen() {
         password,
       });
       await login(data.token, data.user); // saves to secure storage
-      // replace (not push) swaps Login out for Home, so Back can't return here
-      router.replace('/home');
+      // replace (not push) swaps Login out for the tabs, so Back can't return here
+      router.replace('/calendar');
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
       // 403 = right password, but the email isn't verified yet

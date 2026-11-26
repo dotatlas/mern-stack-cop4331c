@@ -29,7 +29,8 @@ import {
 } from '@/reminders';
 import { colors, fonts } from '@/theme';
 
-export default function HomeScreen() {
+// The Reminders tab (this was the Home screen before tabs were added)
+export default function RemindersScreen() {
   const { user, logout } = useAuth();
   const [checking, setChecking] = useState(false);
 
@@ -249,12 +250,13 @@ export default function HomeScreen() {
 
   async function handleLogout() {
     await logout(); // deletes the saved token and user
-    // replace (not push) swaps Home out for Login, so Back can't return here
+    // replace (not push) swaps the whole tabs group out for Login, so Back can't return here
     router.replace('/login');
   }
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    // No bottom edge: the tab bar already keeps clear of the home indicator
+    <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
       {/* Top bar: Log Out on the right, like the web dashboard header */}
       <View style={styles.topBar}>
         <Pressable
